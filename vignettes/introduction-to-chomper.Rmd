@@ -1,0 +1,353 @@
+---
+title: "Introduction to `chomper` package"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Introduction to `chomper` package}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+We will demonstrate the use of the `chomper` package.
+This package facilitates the integration of multiple datasets through probabilistic entity resolution (record linkage, deduplication).
+In this manuscript, we will detail the process of merging the Italian Survey on Household Income and Wealth (ISHIW) data using `chomper` package, thereby illustrating various features of the package.
+The dataset is available for download from the [Bank of Italy](https://www.bancaditalia.it/statistiche/tematiche/indagini-famiglie-imprese/bilanci-famiglie/distribuzione-microdati/index.html) and is surveyed every two years.
+Furthermore, data collected in 2020 and 2022 have been preprocessed for the record linkage task and included in this package, making them available in `italy` dataset.
+Linkage structure estimation using `chomper` package proceeds in the following order.
+
+1. Data loading and exploration
+2. Hyperparameter specification
+3. Model fitting
+4. Linkage structure estimation and performance evaluation
+
+# Example of Linkage Structure Estimation
+## Step 1. Data Loading and Exploration
+This vignette uses `italy` dataset included in the package.
+The data consists of responses from a total of 28,000 participants surveyed by the Bank of Italy in 2020 and 2022.
+The original data contains over 300 responses, but the `chomper` package provides preprocessed data with 9 variables, including a unique identifier.
+The `italy` data is a list of two matrices, each containing 9 variables and 15,198 and 23,057 records, respectively.
+The data is preprocessed and stored so that categorical variables have integer values, and continuous variables are standardized to have a mean of 0 and a variance of 1.
+We use 5 categorical variables (SEX, ANASC, CIT, NASCREG, STUDIO) and 2 continuous variables (NETINCOME, VALABIT) for the example.
+We estimate the linkage structure of 952 records from participants in region 7 because the entire dataset is too large to fit at once.
+
+```{r, echo=TRUE, message=FALSE}
+library(chomper)
+
+data(italy)
+
+# Select variables for the estimation
+#   1. Multinomial
+#     SEX: sex
+#     ANASC: year of birth
+#     CIT: whether Italian or not
+#     NASCREG: place of birth
+#     STUDIO: education level
+#   2. Gaussian (standardized)
+#     NETINCOME: net annual income
+#     VALABIT: estimated price of residence
+discrete_colnames <- c("SEX", "ANASC", "CIT", "NASCREG", "STUDIO")
+continuous_colnames <- c("NETINCOME", "VALABIT")
+common_fields <- c(discrete_colnames, continuous_colnames)
+
+# Set the types of variables.
+# If one type of missing, please set it with 0
+discrete_fields <- 1:5
+n_discrete_fields <- 5
+continuous_fields <- 6:7 # If no continuous fields are used, replace them with 0,
+n_continuous_fields <- 2 # and replace this argument with 0
+
+k <- length(italy) # number of files, 2 in this case
+n <- numeric(k) # number of records in each file
+
+M <- numeric(n_discrete_fields) # number of levels in each categorical variable
+for (l in seq_along(discrete_colnames)) {
+  for (i in 1:k) {
+    if (i == 1) {
+      categories <- italy[[i]][, discrete_colnames[l]]
+    } else {
+      categories <- c(categories, italy[[i]][, discrete_colnames[l]])
+    }
+  }
+  M[l] <- length(unique(categories))
+}
+
+dat <- list()
+for (i in 1:k) {
+  # Select records from the prespecified region;
+  #   IREG: current living region of a respondent
+  dat[[i]] <-
+    italy[[i]][italy[[i]][, "IREG"] == 7, ]
+  n[i] <- nrow(dat[[i]])
+}
+N <- sum(n) # total number of records
+N_max <- N # total number of records, which is used for setting a prior
+
+p <- length(common_fields) # number of variables
+
+# Define the data to link and confirm that each data has a form of matrix
+x <- list()
+for (i in 1:k) {
+  x[[i]] <- as.matrix(dat[[i]][, common_fields])
+}
+```
+
+## Step 2. Hyperparameter Specification
+Before fitting the model, we must specify the necessary hyperparameters.
+Regardless of the inferential method, we must specify the information required for the distribution of each variable and the distortion rate, $\beta_{l}$.
+We start by defining likelihood.
+Note that we use 5 categorical variables that follow multinomial distributions and 2 Gaussian variables.
+The model uses the following likelihood:
+$$
+x_{ijl}\mid\lambda_{ij},y_{\lambda_{ij}l},z_{ijl}\stackrel{\text{ind}}{\sim}
+\begin{cases}
+  \text{MN}\left(1,\boldsymbol{\theta}_{l}\right)^{z_{ijl}}\text{MN}\left(1,\tilde{\phi}_{l}\left(x_{ijl},y_{\lambda_{ij}l},\tau_{l},\varepsilon_{l}\right)\right)^{1-z_{ijl}} & \text{for } l=1,\cdots,l_{1}    \\
+  \text{N}\left(\eta_{l},\sigma_{l}\right)^{z_{ijl}}\text{N}\left(y_{\lambda_{ij}l},\varepsilon_{l}\right)^{1-z_{ijl}}                                                         & \text{for } l=l_{1}+1,\cdots,p
+\end{cases}
+$$
+where $z_{ijl}$ is a distortion indicator and $y_{\lambda_{ij}l}$ is a latent truth.
+In order to adapt locally varying hit, we use
+$$
+\tilde{\phi}_{l}\left(x_{ijl},y_{\lambda_{ij}l},\tau_{l},\varepsilon_{l}\right)=\frac{\phi_{l}^{\frac{1}{\tau_{l}}\mathbb{I}\left(\lvert x_{ijl}-y_{\lambda_{ij}l}\rvert\leq\varepsilon_{l}\right)}}{\sum_{m=1}^{M_{l}}\phi_{l}^{\frac{1}{\tau_{l}}\mathbb{I}\left(\lvert x_{ijl}-m\rvert\leq\varepsilon_{l}\right)}}
+$$
+for $\varepsilon_{l}\geq0$, $\tau_{l}>0$, and $\phi_{l}>0$.
+Thus, we have to specify $\phi_{l}$ and $\tau_{l}$ for $l=1,\cdots,5$ and $\varepsilon_{l}$ for $l=1,\cdots,7$.
+We set $\phi_{l}=2.0$ and $\tau_{l}=0.01$.
+For the variables with a single truth, we use $\varepsilon_{1}=\cdots=\varepsilon_{4}=0$.
+However, as we assume that educational level, net income, and estimated price of residence have multiple truths, we use $\varepsilon_{5}=1$, and $\varepsilon_{6}=\varepsilon_{7}=0.1$.
+```{r, echo=TRUE, message=FALSE}
+# hyperparameter for categorical fields (Multinomial distribution)
+hyper_phi <- rep(2.0, n_discrete_fields)
+hyper_tau <- rep(0.01, n_discrete_fields)
+
+hyper_epsilon_discrete <-
+  c(rep(0, n_discrete_fields - 1), 1) # hitting range for categorical fields.
+# As education level is assumed to have multiple truths,
+# we set epsilon of that field as 1.
+hyper_epsilon_continuous <-
+  rep(0.1, n_continuous_fields) # hitting range for continuous fields.
+# Continuous fields are assumed to have multiple truths, we set epsilon as 0.1.
+```
+
+`chomper` uses a non-informative Dirichlet prior for the parameter vector, $\boldsymbol{\theta}_{l}$, of the multinomial distribution, which is defined internally within the package.
+The mean of the Gaussian distribution, $\eta_{l}$, uses a diffuse prior, also defined internally within the package.
+However, the variance $\sigma_{l}$ uses an inverse-gamma prior, which provides an option that can be specified by the user.
+Therefore, we must specify the hyperparameters of the inverse-gamma prior.
+In this example, both the shape and scale parameters are set to 0.01.
+$$
+\sigma_{l}\sim\text{Inverse-Gamma}\left(0.01,0.01\right),
+$$
+where $l$ is the index of the continuous variable.
+We finish specifying the hyperparameters by assuming that the average distortion rate for all variables is 1\%:
+$$
+\beta_{l}\sim\text{Beta}\left(N_{\max}\times0.01\times0.01,N_{\max}\times0.01\right), 
+$$
+where $N_{\max}=952$ for the region 7.
+```{r, echo=TRUE, message=FALSE}
+hyper_sigma <- matrix(
+  rep(c(0.01, 0.01), n_continuous_fields),
+  ncol = 2, byrow = TRUE
+) # prior distribution for the variance of Gaussian, setting non-informative
+
+hyper_beta <- matrix(
+  rep(c(N_max * 0.1 * 0.01, N_max * 0.1), p),
+  ncol = 2, byrow = TRUE
+) # prior distribution for distortion rate, following Marchant et al. (2021)
+```
+
+## Step 3. Model Fitting
+Fit the model using the data loaded in Step 1 and the hyperparameters specified in Step 2.
+The `chomper` package provides inference using MCMC and EVIL, but this example demonstrates the use of `chomperMCMC`, with instructions for using `chomperEVIL` provided as comments in the code chunks.
+To generate posterior samples via MCMC, we must additionally define the number of samples to be used for inference.
+Furthermore, since `chomperMCMC` performs a split and merge procedure for each Gibbs iteration, we must also define the number of split and merge procedures per Gibbs iteration.
+We generate a total of 5,000 posterior samples, discard the first 4,000 as burn-in samples, and use the last 1,000 samples for inference.
+The number of split and merge procedures per Gibbs iteration is set to 1,000.
+The `chomper` package allows the user to set the maximum run time (in seconds), with the default being 24 hours.
+```{r, echo=TRUE, message=FALSE, eval=FALSE}
+res <- chomperMCMC(
+  x = x, k = k, n = n, N = N, p = p, M = M,
+  discrete_fields = discrete_fields,
+  continuous_fields = continuous_fields,
+  hyper_beta = hyper_beta,
+  hyper_phi = hyper_phi,
+  hyper_tau = hyper_tau,
+  hyper_epsilon_discrete = hyper_epsilon_discrete,
+  hyper_epsilon_continuous = hyper_epsilon_continuous,
+  hyper_sigma = hyper_sigma,
+  n_burnin = 4000, # number of burn-in samples
+  n_gibbs = 1000, # number of MCMC samples to store
+  n_split_merge = 1, # number of split and merge procedures in each Gibbs iteration
+  max_time = 86400 # maximum time in second for MCMC
+)
+
+# Example code for using `chomperEVIL`
+# res <- chomperEVIL(
+#     x = x, k = k, n = n, N = N, p = p, M = M,
+#     discrete_fields = discrete_fields,
+#     continuous_fields = continuous_fields,
+#     hyper_beta = hyper_beta,
+#     hyper_phi = hyper_phi,
+#     hyper_tau = hyper_tau,
+#     hyper_delta = hyper_delta,
+#     hyper_sigma = hyper_sigma,
+#     overlap_prob = 0.5, # probability for the initialization.
+#     # This probability of records will be initially considered as linked.
+#     n_parents = 50, # number of parents, N_P
+#     n_children = 100, # number of offspring, N_O
+#     tol_cavi = 1e-5, # stopping criterion for a single CAVI
+#     max_iter_cavi = 10, # maximum number of CAVI update for a single member
+#     tol_evi = 1e-5, # stopping criterion for an evolution
+#     max_iter_evi = 50, # maximum number of evolution, N_E
+#     verbose = 1,
+#     n_threads = 7 # number of cores to be parallelized
+# )
+```
+
+`chomperMCMC` returns a list of posterior samples of the linkage structure and other parameters, and `chomperEVIL` returns a list of approximated parameters of the variational factors and other information.
+Among posterior samples, we will use $\boldsymbol{\Lambda}$ to estimate the linkage structure, which can be accessed as `res$lambda`.
+If you fit the model using `chomperEVIL`, you can access the approximated parameters of the variational factors corresponding to $\boldsymbol{\Lambda}$ as `res$nu`.
+
+## Step 4. Linkage Structure Estimation and Performance Evaluation
+Using $\boldsymbol{\Lambda}$ sampled via `chomperMCMC`, we can estimate the linkage structure and evaluate estimation performance using the unique identifier in the `italy` dataset.
+While we can compute various point estimates using posterior samples, we use a Bayes estimate that minimizes Binder's loss.
+Since the `chomper` package does not provide a function to compute the Bayes estimate, we use the `salso` function from the `salso` package to compute a Bayes estimate.
+First, we use `ID`, the unique identifier of the `italy` dataset, and the `links` function from the `blink` package to find the true linkage structure.
+```{r, echo=TRUE, message=FALSE}
+library(blink)
+library(salso)
+
+for (i in 1:k) { # `k` represents the number of files
+  if (i == 1) {
+    key_true <- dat[[i]][, "ID"]
+  } else {
+    key_true <- c(key_true, dat[[i]][, "ID"])
+  }
+}
+
+# Find the true linkage structure.
+# An external R package, `blink`, is used, especially, `blink::links`
+truth_binded <- matrix(key_true, nrow = 1)
+linkage_structure_true <- links(truth_binded, TRUE, TRUE)
+linkage_truth <- matrix(linkage_structure_true)
+
+head(linkage_truth)
+```
+
+```{r, echo=FALSE, message=FALSE}
+res <- readRDS("vignette_lambda.rds")
+```
+
+The `salso` function takes a posterior similarity matrix as an argument and calculates the Bayes estimate that minimizes Binder's loss.
+Therefore, the process of calculating the posterior similarity matrix using `res$lambda` must precede this step.
+Since `chomperMCMC` returns posterior samples as a list, use the `flatten_posterior_samples` function provided by the `chomper` package to convert the posterior samples into a matrix format.
+Next, we compute the posterior similarity matrix using the `psm_mcmc` function.
+If `chomperEVIL` is used, the approximate posterior variational factors, `res$nu`, can be used directly as an argument to `psm_vi` to compute the posterior similarity matrix.
+```{r, echo=TRUE, message=FALSE}
+# In order to use MCMC samples:
+#   1. slice the actual MCMC samples
+#   2. reshape a list into a matrix form
+lambda_binded <-
+  flatten_posterior_samples(
+    res$lambda[4001:5000], k, N
+  )
+
+psm_lambda <- psm_mcmc(lambda_binded)
+
+# # Approximate posterior distribution is used directly
+# # to calculate a posterior similarity matrix
+# psm_lambda <- psm_vi(result$nu)
+
+# Calculate a Bayes estimate that minimizes Binder's loss
+salso_estimate <- salso(round(psm_lambda, nchar(N) + 1), # rounding is implemented to avoid floating-point error
+  loss = binder(),
+  maxZealousAttempts = 0, probSequentialAllocation = 1
+)
+
+# Convert a Bayes estimate to have an appropriate structure to evaluate the performance
+linkage_structure <- list()
+for (ll in seq_along(salso_estimate)) {
+  linkage_structure[[ll]] <- which(salso_estimate == salso_estimate[ll])
+}
+linkage_estimation <- matrix(linkage_structure)
+```
+
+The package provides a function, `performance`, that evaluates performance given an estimate and truth.
+This function returns several performance metrics, including true positives, true negatives, false positives, false negatives, false positive rate, and false negative rate, in a list format.
+Using the `return_matrix=TRUE` option, the function also returns the linkage estimation results for each record pair in a matrix format.
+```{r, echo=TRUE, message=FALSE}
+# Calculate the performance of the estimation
+perf <- performance(linkage_estimation, linkage_truth, N, FALSE)
+
+# Print the performance
+performance_matrix <-
+  c(perf$fnr, perf$fpr, perf$tp, perf$fp, perf$tn, perf$fn)
+performance_matrix <-
+  matrix(
+    c(2 * performance_matrix[3] /
+      (2 * performance_matrix[3] +
+        performance_matrix[4] +
+        performance_matrix[6]), performance_matrix),
+    nrow = 1
+  )
+colnames(performance_matrix) <- c("F1", "FNR", "FPR", "TP", "FP", "TN", "FN")
+rownames(performance_matrix) <- c("Region 7")
+print(performance_matrix)
+```
+
+The number of burn-in samples is determined by the trace plot of number of unique $\lambda_{ij}$'s in the lower left.
+Using the posterior sample, the number of unique entities in the data can also be estimated and visualized, as in the density plot in the lower right.
+```{r, echo=TRUE, message=FALSE, fig.width=8, fig.height=3, out.width="95%"}
+library(ggplot2)
+library(patchwork)
+
+unique_entities <- numeric(5000)
+for (i in 1:5000) {
+  unique_entities[i] <-
+    length(unique(c(res$lambda[[i]][[1]], res$lambda[[i]][[2]])))
+}
+
+df_trace <- data.frame(idx = 1:5000, unique_entities = unique_entities)
+
+plot_trace <- ggplot(df_trace, aes(x = idx)) +
+  geom_line(aes(y = unique_entities)) +
+  labs(title = "Traceplot of MCMC Samples", x = NULL, y = NULL) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    panel.border = element_blank(),
+    axis.line.x = element_line(linewidth = .2),
+    axis.line.y = element_line(linewidth = .2)
+  )
+
+true_unique_entities <- length(unique(key_true))
+
+df_density <- data.frame(unique_entities = unique_entities[4001:5000])
+
+plot_density <- ggplot(df_density) +
+  geom_density(aes(x = unique_entities, colour = "Estimate"),
+    adjust = 2, key_glyph = "path"
+  ) +
+  geom_vline(aes(xintercept = length(unique(key_true)), colour = "Truth")) +
+  scale_colour_manual(values = c("Estimate" = "black", "Truth" = "red")) +
+  xlim(500, 1000) +
+  labs(title = "Estimated Number of Unique Entities", x = NULL, y = NULL) +
+  theme_bw() +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "inside",
+    legend.position.inside = c(0.85, 0.9),
+    legend.title = element_blank(),
+    legend.background = element_rect(fill = "transparent", color = NA),
+    panel.border = element_blank(),
+    axis.line.x = element_line(linewidth = .2),
+    axis.line.y = element_line(linewidth = .2)
+  )
+
+plot_trace + plot_density + plot_layout(ncol = 2)
+```

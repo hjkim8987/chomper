@@ -21,7 +21,7 @@
 
 ## Installation
 
-You can install the development version of `chomper` from [GitHub](https://github.com/hjkim8987/chomper) with:
+You can install `chomper` from [GitHub](https://github.com/hjkim8987/chomper) with:
 
 ```r
 # install.packages("devtools")

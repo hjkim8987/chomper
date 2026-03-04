@@ -181,7 +181,7 @@ res <- chomperMCMC(
   hyper_sigma = hyper_sigma,
   n_burnin = 4000, # number of burn-in samples
   n_gibbs = 1000, # number of MCMC samples to store
-  n_split_merge = 1, # number of split and merge procedures in each Gibbs iteration
+  n_split_merge = 1000, # number of split and merge procedures in each Gibbs iteration
   max_time = 86400 # maximum time in second for MCMC
 )
 
@@ -240,6 +240,7 @@ head(linkage_truth)
 
 ```{r, echo=FALSE, message=FALSE}
 res <- readRDS("vignette_lambda.rds")
+res$lambda <- res$lambda[4001:5000]
 ```
 
 The `salso` function takes a posterior similarity matrix as an argument and calculates the Bayes estimate that minimizes Binder's loss.
@@ -253,7 +254,7 @@ If `chomperEVIL` is used, the approximate posterior variational factors, `res$nu
 #   2. reshape a list into a matrix form
 lambda_binded <-
   flatten_posterior_samples(
-    res$lambda[4001:5000], k, N
+    res$lambda, k, N
   )
 
 psm_lambda <- psm_mcmc(lambda_binded)
@@ -299,9 +300,33 @@ rownames(performance_matrix) <- c("Region 7")
 print(performance_matrix)
 ```
 
+```{r, echo=FALSE, message=FALSE}
+res <- readRDS("vignette_lambda.rds")
+```
+
+In order to diagnose convergence of MCMC, we can use a trace plot of number of unique $\lambda_{ij}$.
+As only 1,000 MCMC samples were used for inference before, we re-run `chomperMCMC` without burn-in.
+```{r, echo=TRUE, message=FALSE, eval=FALSE}
+res <- chomperMCMC(
+  x = x, k = k, n = n, N = N, p = p, M = M,
+  discrete_fields = discrete_fields,
+  continuous_fields = continuous_fields,
+  hyper_beta = hyper_beta,
+  hyper_phi = hyper_phi,
+  hyper_tau = hyper_tau,
+  hyper_epsilon_discrete = hyper_epsilon_discrete,
+  hyper_epsilon_continuous = hyper_epsilon_continuous,
+  hyper_sigma = hyper_sigma,
+  n_burnin = 0, # number of burn-in samples
+  n_gibbs = 5000, # number of MCMC samples to store
+  n_split_merge = 1000, # number of split and merge procedures in each Gibbs iteration
+  max_time = 86400 # maximum time in second for MCMC
+)
+```
+
 The number of burn-in samples is determined by the trace plot of number of unique $\lambda_{ij}$'s in the lower left.
 Using the posterior sample, the number of unique entities in the data can also be estimated and visualized, as in the density plot in the lower right.
-```{r, echo=TRUE, message=FALSE, fig.width=8, fig.height=3, out.width="95%"}
+```{r, echo=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3, out.width="95%"}
 library(ggplot2)
 library(patchwork)
 

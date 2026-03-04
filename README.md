@@ -45,10 +45,12 @@ sample_data <- generate_sample_data(
   distortion_ratio = c(0.1, 0.1, 0.1, 0.1)
 )
 
-# Get file information
+# Get file information and drop "id" column
 n <- numeric(3)
+x <- list()
 for (i in 1:3) {
-  n[i] <- nrow(sample_data$original[[i]])
+  n[i] <- nrow(sample_data[[i]])
+  x[[i]] <- sample_data[[i]][, colnames(sample_data[[i]]) != "id", drop = FALSE]
 }
 N <- sum(n)
 
@@ -65,7 +67,7 @@ hyper_sigma <- matrix(
 
 # Perform record linkage using EVIL
 result <- chomperEVIL(
-  x = sample_data$x,
+  x = x,
   k = 3,  # number of datasets
   n = n,  # rows per dataset
   N = N,  # columns per dataset
@@ -100,7 +102,7 @@ library(blink)
 
 key_temp <- c()
 for (i in 1:3) {
-  key_temp <- c(key_temp, sample_data$original[[i]][, 1])
+  key_temp <- c(key_temp, sample_data[[i]][, "id"])
 }
 
 truth_binded <- matrix(key_temp, nrow = 1)

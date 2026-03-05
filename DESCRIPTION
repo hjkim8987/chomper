@@ -1,11 +1,11 @@
 Package: chomper
-Title: CHOMPER: A Comprehensive Hit Or Miss Probabilistic Entity Resolution Model
-Version: 0.0.1
+Title: A Comprehensive Hit or Miss Probabilistic Entity Resolution Model
+Version: 0.1.0
 Authors@R: 
-    c(person("Hyungjoon", "Kim", email = "Hyungjoon.Kim@colostate.edu", role = c("aut", "cre")),
+    c(person("Hyungjoon", "Kim", email = "hjkim8987@gmail.com", role = c("aut", "cre")),
       person("Andee", "Kaplan", email = "Andee.Kaplan@colostate.edu", role = c("aut")),
       person("Matthew", "Koslovsky", email = "Matt.Koslovsky@colostate.edu", role = c("aut")))
-Description: `chomper` (Comprehensive Hit Or Miss Probabilistic Entity Resolution) is an R package that provides Bayesian probabilistic methods for record linkage and entity resolution across multiple datasets.
+Description: Provides Bayesian probabilistic methods for record linkage and entity resolution across multiple datasets using the Comprehensive Hit Or Miss Probabilistic Entity Resolution (CHOMPER) model.
     The package implements three main inference approaches: (1) Evolutionary Variational Inference for record Linkage (EVIL), (2) Coordinate Ascent Variational Inference (CAVI), and (3) Markov Chain Monte Carlo (MCMC) with split and merge process.
     The model supports both discrete and continuous fields, and it performs locally-varying hit mechanism for the attributes with multiple truths.
     It also provides tools for performance evaluation based on either approximated variational factors or posterior samples.
@@ -31,3 +31,5 @@ Suggests:
     rmarkdown,
     salso
 VignetteBuilder: knitr
+URL: https://github.com/hjkim8987/chomper
+BugReports: https://github.com/hjkim8987/chomper/issues

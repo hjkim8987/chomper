@@ -22,7 +22,7 @@ generate_sample_data(
 
 \item{n_files}{The number of files.}
 
-\item{overlap_ratio}{The ratio of overlaping entities across the files.}
+\item{overlap_ratio}{The ratio of overlapping entities across the files.}
 
 \item{discrete_columns}{The indices of the discrete columns (1-based index).}
 

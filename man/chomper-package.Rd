@@ -4,12 +4,20 @@
 \name{chomper-package}
 \alias{chomper}
 \alias{chomper-package}
-\title{chomper: CHOMPER: A Comprehensive Hit Or Miss Probabilistic Entity Resolution Model}
+\title{chomper: A Comprehensive Hit or Miss Probabilistic Entity Resolution Model}
 \description{
-`chomper` (Comprehensive Hit Or Miss Probabilistic Entity Resolution) is an R package that provides Bayesian probabilistic methods for record linkage and entity resolution across multiple datasets. The package implements three main inference approaches: (1) Evolutionary Variational Inference for record Linkage (EVIL), (2) Coordinate Ascent Variational Inference (CAVI), and (3) Markov Chain Monte Carlo (MCMC) with split and merge process. The model supports both discrete and continuous fields, and it performs locally-varying hit mechanism for the attributes with multiple truths. It also provides tools for performance evaluation based on either approximated variational factors or posterior samples. The package is designed to support parallel computing with multi-threading support for EVIL to estimate the linkage structure faster.
+Provides Bayesian probabilistic methods for record linkage and entity resolution across multiple datasets using the Comprehensive Hit Or Miss Probabilistic Entity Resolution (CHOMPER) model. The package implements three main inference approaches: (1) Evolutionary Variational Inference for record Linkage (EVIL), (2) Coordinate Ascent Variational Inference (CAVI), and (3) Markov Chain Monte Carlo (MCMC) with split and merge process. The model supports both discrete and continuous fields, and it performs locally-varying hit mechanism for the attributes with multiple truths. It also provides tools for performance evaluation based on either approximated variational factors or posterior samples. The package is designed to support parallel computing with multi-threading support for EVIL to estimate the linkage structure faster.
+}
+\seealso{
+Useful links:
+\itemize{
+  \item \url{https://github.com/hjkim8987/chomper}
+  \item Report bugs at \url{https://github.com/hjkim8987/chomper/issues}
+}
+
 }
 \author{
-\strong{Maintainer}: Hyungjoon Kim \email{Hyungjoon.Kim@colostate.edu}
+\strong{Maintainer}: Hyungjoon Kim \email{hjkim8987@gmail.com}
 
 Authors:
 \itemize{

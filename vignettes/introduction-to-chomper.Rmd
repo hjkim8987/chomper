@@ -16,23 +16,23 @@ knitr::opts_chunk$set(
 
 We will demonstrate the use of the `chomper` package.
 This package facilitates the integration of multiple datasets through probabilistic entity resolution (record linkage, deduplication).
-In this manuscript, we will detail the process of merging the Italian Survey on Household Income and Wealth (ISHIW) data using `chomper` package, thereby illustrating various features of the package.
+In this vignette, we detail the process of merging the Italian Survey on Household Income and Wealth (ISHIW) data using `chomper` package, thereby illustrating various features of the package.
 The dataset is available for download from the [Bank of Italy](https://www.bancaditalia.it/statistiche/tematiche/indagini-famiglie-imprese/bilanci-famiglie/distribuzione-microdati/index.html) and is surveyed every two years.
-Furthermore, data collected in 2020 and 2022 have been preprocessed for the record linkage task and included in this package, making them available in `italy` dataset.
+Furthermore, data collected in 2020 and 2022 have been preprocessed for the record linkage task and included in this package, made available in the `italy` dataset.
 Linkage structure estimation using `chomper` package proceeds in the following order.
 
 1. Data loading and exploration
 2. Hyperparameter specification
-3. Model fitting
+3. Posterior estimation
 4. Linkage structure estimation and performance evaluation
 
 # Example of Linkage Structure Estimation
 ## Step 1. Data Loading and Exploration
-This vignette uses `italy` dataset included in the package.
-The data consists of responses from a total of 28,000 participants surveyed by the Bank of Italy in 2020 and 2022.
-The original data contains over 300 responses, but the `chomper` package provides preprocessed data with 9 variables, including a unique identifier.
-The `italy` data is a list of two matrices, each containing 9 variables and 15,198 and 23,057 records, respectively.
-The data is preprocessed and stored so that categorical variables have integer values, and continuous variables are standardized to have a mean of 0 and a variance of 1.
+This vignette uses the `italy` dataset included in the package.
+The data consist of responses from a total of 28,000 participants surveyed by the Bank of Italy in 2020 and 2022.
+The original dataset contains over 300 responses, but the `chomper` package provides preprocessed data with 9 variables, including a unique identifier.
+The `italy` dataset is a list of two matrices, each containing 9 variables and 15,198 and 23,057 records, respectively.
+The data are preprocessed and stored so that categorical variables have integer values, and continuous variables are standardized to have a mean of 0 and a variance of 1.
 We use 5 categorical variables (SEX, ANASC, CIT, NASCREG, STUDIO) and 2 continuous variables (NETINCOME, VALABIT) for the example.
 We estimate the linkage structure of 952 records from participants in region 7 because the entire dataset is too large to fit at once.
 
@@ -56,7 +56,7 @@ continuous_colnames <- c("NETINCOME", "VALABIT")
 common_fields <- c(discrete_colnames, continuous_colnames)
 
 # Set the types of variables.
-# If one type of missing, please set it with 0
+# If one type is missing, please set it to 0
 discrete_fields <- 1:5
 n_discrete_fields <- 5
 continuous_fields <- 6:7 # If no continuous fields are used, replace them with 0,
@@ -98,11 +98,11 @@ for (i in 1:k) {
 ```
 
 ## Step 2. Hyperparameter Specification
-Before fitting the model, we must specify the necessary hyperparameters.
-Regardless of the inferential method, we must specify the information required for the distribution of each variable and the distortion rate, $\beta_{l}$.
-We start by defining likelihood.
+Before running the model, we must specify the necessary hyperparameters.
+Regardless of the inferential method, we specify the information required for the distribution of each variable and the distortion rate, $\beta_{l}$.
+We start by defining the likelihood.
 Note that we use 5 categorical variables that follow multinomial distributions and 2 Gaussian variables.
-The model uses the following likelihood:
+The model assumes the following likelihood:
 $$
 x_{ijl}\mid\lambda_{ij},y_{\lambda_{ij}l},z_{ijl}\stackrel{\text{ind}}{\sim}
 \begin{cases}
@@ -111,14 +111,14 @@ x_{ijl}\mid\lambda_{ij},y_{\lambda_{ij}l},z_{ijl}\stackrel{\text{ind}}{\sim}
 \end{cases}
 $$
 where $z_{ijl}$ is a distortion indicator and $y_{\lambda_{ij}l}$ is a latent truth.
-In order to adapt locally varying hit, we use
+In order to adopt locally-varying hits, we assume
 $$
 \tilde{\phi}_{l}\left(x_{ijl},y_{\lambda_{ij}l},\tau_{l},\varepsilon_{l}\right)=\frac{\phi_{l}^{\frac{1}{\tau_{l}}\mathbb{I}\left(\lvert x_{ijl}-y_{\lambda_{ij}l}\rvert\leq\varepsilon_{l}\right)}}{\sum_{m=1}^{M_{l}}\phi_{l}^{\frac{1}{\tau_{l}}\mathbb{I}\left(\lvert x_{ijl}-m\rvert\leq\varepsilon_{l}\right)}}
 $$
-for $\varepsilon_{l}\geq0$, $\tau_{l}>0$, and $\phi_{l}>0$.
+for $\varepsilon_{l}\geq0$, $\tau_{l}>0$, and $\phi_{l}>1$.
 Thus, we have to specify $\phi_{l}$ and $\tau_{l}$ for $l=1,\cdots,5$ and $\varepsilon_{l}$ for $l=1,\cdots,7$.
 We set $\phi_{l}=2.0$ and $\tau_{l}=0.01$.
-For the variables with a single truth, we use $\varepsilon_{1}=\cdots=\varepsilon_{4}=0$.
+For variables with a single truth, we use $\varepsilon_{1}=\cdots=\varepsilon_{4}=0$.
 However, as we assume that educational level, net income, and estimated price of residence have multiple truths, we use $\varepsilon_{5}=1$, and $\varepsilon_{6}=\varepsilon_{7}=0.1$.
 ```{r, echo=TRUE, message=FALSE}
 # hyperparameter for categorical fields (Multinomial distribution)
@@ -136,7 +136,7 @@ hyper_epsilon_continuous <-
 
 `chomper` uses a non-informative Dirichlet prior for the parameter vector, $\boldsymbol{\theta}_{l}$, of the multinomial distribution, which is defined internally within the package.
 The mean of the Gaussian distribution, $\eta_{l}$, uses a diffuse prior, also defined internally within the package.
-However, the variance $\sigma_{l}$ uses an inverse-gamma prior, which provides an option that can be specified by the user.
+However, the variance $\sigma_{l}$ follows an inverse-gamma prior, which provides an option that can be specified by the user.
 Therefore, we must specify the hyperparameters of the inverse-gamma prior.
 In this example, both the shape and scale parameters are set to 0.01.
 $$
@@ -147,7 +147,7 @@ We finish specifying the hyperparameters by assuming that the average distortion
 $$
 \beta_{l}\sim\text{Beta}\left(N_{\max}\times0.01\times0.01,N_{\max}\times0.01\right), 
 $$
-where $N_{\max}=952$ for the region 7.
+where $N_{\max}=952$ for region 7.
 ```{r, echo=TRUE, message=FALSE}
 hyper_sigma <- matrix(
   rep(c(0.01, 0.01), n_continuous_fields),
@@ -160,11 +160,11 @@ hyper_beta <- matrix(
 ) # prior distribution for distortion rate, following Marchant et al. (2021)
 ```
 
-## Step 3. Model Fitting
-Fit the model using the data loaded in Step 1 and the hyperparameters specified in Step 2.
-The `chomper` package provides inference using MCMC and EVIL, but this example demonstrates the use of `chomperMCMC`, with instructions for using `chomperEVIL` provided as comments in the code chunks.
+## Step 3. Posterior Estimation
+Run the model using the data loaded in Step 1 and the hyperparameters specified in Step 2.
+The `chomper` package provides inference using MCMC and VI, but this example demonstrates the use of `chomperMCMC`, with instructions for using `chomperEVIL` provided as comments in the code chunks.
 To generate posterior samples via MCMC, we must additionally define the number of samples to be used for inference.
-Furthermore, since `chomperMCMC` performs a split and merge procedure for each Gibbs iteration, we must also define the number of split and merge procedures per Gibbs iteration.
+Furthermore, since `chomperMCMC` performs a split and merge steps for each Gibbs iteration, we must also define the number of split and merge steps per Gibbs iteration.
 We generate a total of 5,000 posterior samples, discard the first 4,000 as burn-in samples, and use the last 1,000 samples for inference.
 The number of split and merge procedures per Gibbs iteration is set to 1,000.
 The `chomper` package allows the user to set the maximum run time (in seconds), with the default being 24 hours.
@@ -210,10 +210,10 @@ res <- chomperMCMC(
 
 `chomperMCMC` returns a list of posterior samples of the linkage structure and other parameters, and `chomperEVIL` returns a list of approximated parameters of the variational factors and other information.
 Among posterior samples, we will use $\boldsymbol{\Lambda}$ to estimate the linkage structure, which can be accessed as `res$lambda`.
-If you fit the model using `chomperEVIL`, you can access the approximated parameters of the variational factors corresponding to $\boldsymbol{\Lambda}$ as `res$nu`.
+If you run the model using `chomperEVIL`, you can access the approximated parameters of the variational factors corresponding to $\boldsymbol{\Lambda}$ as `res$nu`.
 
 ## Step 4. Linkage Structure Estimation and Performance Evaluation
-Using $\boldsymbol{\Lambda}$ sampled via `chomperMCMC`, we can estimate the linkage structure and evaluate estimation performance using the unique identifier in the `italy` dataset.
+Using $\boldsymbol{\Lambda}$ sampled via `chomperMCMC`, we can estimate the linkage structure and evaluate estimation performance using the unique identifiers in the `italy` dataset.
 While we can compute various point estimates using posterior samples, we use a Bayes estimate that minimizes Binder's loss.
 Since the `chomper` package does not provide a function to compute the Bayes estimate, we use the `salso` function from the `salso` package to compute a Bayes estimate.
 First, we use `ID`, the unique identifier of the `italy` dataset, and the `links` function from the `blink` package to find the true linkage structure.
@@ -325,7 +325,7 @@ res <- chomperMCMC(
 ```
 
 The number of burn-in samples is determined by the trace plot of number of unique $\lambda_{ij}$'s in the lower left.
-Using the posterior sample, the number of unique entities in the data can also be estimated and visualized, as in the density plot in the lower right.
+Using the posterior samples, the number of unique entities in the data can also be estimated and visualized, as in the density plot in the lower right.
 ```{r, echo=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3, out.width="95%"}
 library(ggplot2)
 library(patchwork)

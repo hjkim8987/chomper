@@ -2,6 +2,7 @@
 # chomper
 
 <!-- badges: start -->
+[![R-CMD-check](https://github.com/hjkim8987/chomper/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/hjkim8987/chomper/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 ## Overview
@@ -25,7 +26,7 @@ You can install `chomper` from [GitHub](https://github.com/hjkim8987/chomper) wi
 
 ```r
 # install.packages("devtools")
-devtools::install_github("hjkim8987/chomper")
+devtools::install_github("hjkim8987/chomper", dependencies = TRUE, build_vignettes = TRUE)
 ```
 
 ## Quick Start

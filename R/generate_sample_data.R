@@ -6,7 +6,7 @@
 #'
 #' @param n_entities The number of entities.
 #' @param n_files The number of files.
-#' @param overlap_ratio The ratio of overlaping entities across the files.
+#' @param overlap_ratio The ratio of overlapping entities across the files.
 #' @param discrete_columns The indices of the discrete columns (1-based index).
 #' @param discrete_levels The levels of the discrete columns (vector of length of discrete columns).
 #' @param continuous_columns The indices of the continuous columns (1-based index).

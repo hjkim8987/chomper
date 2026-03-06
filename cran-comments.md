@@ -17,3 +17,4 @@ This is a resubmission. Changes since the first submission:
 * local macOS (Apple Silicon), R 4.4.1
 * GitHub Actions: macos-latest (release), windows-latest (release), ubuntu-latest (devel), ubuntu-latest (release), ubuntu-latest(oldrel-1)
 * win-builder: R-devel, R-release
+* Note: rhub checks failed due to outdated Rust version in rhub environments (`salso` dependency requires Rust >= 1.80.1)

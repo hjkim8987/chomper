@@ -367,7 +367,7 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       // For each possible level of a categorical variable,
       for (int m = 0; m < M(l); m++) {
         // If the |x_{ijl} - m| <= delta_{l},
-        if (abs(m_out - m) <= hyper_delta(l)) {
+        if (std::fabs(m_out - m) <= hyper_delta(l)) {
           // Multiply log(phi_{l}^{1 / tau_{l}})
           each_log_level(m) = log_phi_tau;
         }
@@ -396,7 +396,8 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       for (int j = 0; j < n(i); j++) {
         for (int m = 0; m < M(l); m++) {
           // If the |x_{ijl} - m| <= delta_{l},
-          if (abs(x(i)(j, discrete_fields(l)) - (m + 1)) <= hyper_delta(l)) {
+          if (std::fabs(x(i)(j, discrete_fields(l)) - (m + 1)) <=
+              hyper_delta(l)) {
             // Set the indicator to one
             each_x_in_range(j, m) = 1;
           }

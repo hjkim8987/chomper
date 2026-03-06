@@ -1,10 +1,9 @@
-## Resubmission
+## Resubmission (0.1.2)
 
-This is a resubmission. Changes since the first submission:
+This is a resubmission. Changes since previous submission:
 
-* Added `-latomic` to `src/Makevars` to fix a linking error on Linux: `__atomic_compare_exchange`.
-* Added `inst/WORDLIST` to suppress spell check notes for domain-specific terms (CAVI, Variational).
-* Updated the version number to 0.1.1.
+* Replaced all instances of `abs()` with `std::abs()` or `std::fabs()` to ensure proper handling of floating-point arguments, resolving the `-Wabsolute-value` warning.
+* Updated the version number to 0.1.2.
 
 ## R CMD check results
 

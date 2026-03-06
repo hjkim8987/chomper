@@ -10,7 +10,7 @@ Description: Provides Bayesian probabilistic methods for record linkage and enti
     The model supports both discrete and continuous fields, and it performs locally-varying hit mechanism for the attributes with multiple truths.
     It also provides tools for performance evaluation based on either approximated variational factors or posterior samples.
     The package is designed to support parallel computing with multi-threading support for EVIL to estimate the linkage structure faster.
-License: GPL-3
+License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.2

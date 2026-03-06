@@ -135,7 +135,7 @@ print(perf)
 
 ## License
 
-This package is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE.md) file for details.
+This package is licensed under the GNU General Public License v3.0 - see the [LICENSE](https://github.com/hjkim8987/chomper/blob/main/LICENSE.md) file for details.
 
 ## Authors
 

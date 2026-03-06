@@ -1,6 +1,6 @@
 Package: chomper
 Title: A Comprehensive Hit or Miss Probabilistic Entity Resolution Model
-Version: 0.1.0
+Version: 0.1.1
 Authors@R: 
     c(person("Hyungjoon", "Kim", email = "hjkim8987@gmail.com", role = c("aut", "cre")),
       person("Andee", "Kaplan", email = "Andee.Kaplan@colostate.edu", role = c("aut")),
@@ -29,7 +29,9 @@ Suggests:
     knitr,
     patchwork,
     rmarkdown,
-    salso
+    salso,
+    spelling
 VignetteBuilder: knitr
 URL: https://github.com/hjkim8987/chomper
 BugReports: https://github.com/hjkim8987/chomper/issues
+Language: en-US

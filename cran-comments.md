@@ -1,3 +1,11 @@
+## Resubmission
+
+This is a resubmission. Changes since the first submission:
+
+* Added `-latomic` to `src/Makevars` to fix a linking error on Linux: `__atomic_compare_exchange`.
+* Added `inst/WORDLIST` to suppress spell check notes for domain-specific terms (CAVI, Variational).
+* Updated the version number to 0.1.1.
+
 ## R CMD check results
 
 0 errors | 0 warnings | 1 note

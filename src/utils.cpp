@@ -296,7 +296,7 @@ double log_sum_exp(NumericVector x) {
 double log_sum_exp(arma::rowvec x) {
   double lse = 0.0;
   double max_x = max(x);
-  for (int i = 0; i < x.size(); i++) {
+  for (size_t i = 0; i < x.size(); i++) {
     lse += exp(x(i) - max_x);
   }
   return log(lse) + max_x;
@@ -310,7 +310,7 @@ double log_sum_exp(arma::rowvec x) {
 NumericVector log_softmax(NumericVector x, bool log) {
   double lse = log_sum_exp(x);
   NumericVector result(x.size());
-  for (int i = 0; i < x.size(); i++) {
+  for (size_t i = 0; i < x.size(); i++) {
     result(i) = x(i) - lse;
     if (!log) {
       result(i) = exp(result(i));
@@ -327,7 +327,7 @@ NumericVector log_softmax(NumericVector x, bool log) {
 arma::rowvec log_softmax(arma::rowvec x, bool log) {
   double lse = log_sum_exp(x);
   arma::rowvec result(x.n_elem);
-  for (int i = 0; i < x.n_elem; i++) {
+  for (size_t i = 0; i < x.n_elem; i++) {
     result(i) = x(i) - lse;
     if (!log) {
       result(i) = exp(result(i));
@@ -393,7 +393,7 @@ arma::field<arma::ivec> find_duplicates(const arma::ivec& vec) {
   std::set<int> processed;
   std::vector<arma::ivec> temp_result;
 
-  for (int i = 0; i < vec.n_elem; i++) {
+  for (size_t i = 0; i < vec.n_elem; i++) {
     if (processed.find(vec(i)) == processed.end()) {
       arma::uvec indices = arma::find(vec == vec(i));
       if (indices.n_elem > 1) {

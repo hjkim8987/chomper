@@ -565,7 +565,7 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
         if (split_merge(0)(0, 0) == 1) {
           // Accept Split and Merge Result:
           // i.e., shift Lambda to Lambda', y to y', and z to z'
-          for (int c = 0; c < split_merge(1).n_rows; c++) {
+          for (size_t c = 0; c < split_merge(1).n_rows; c++) {
             // Shift Lambda to Lambda'
             lambda(split_merge(1)(c, 0))(split_merge(1)(c, 1)) =
                 split_merge(1)(c, 2);
@@ -575,7 +575,7 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
                 split_merge(3).row(c);
           }
           // Shift y to y'
-          for (int yl = 0; yl < split_merge(4).n_rows; yl++) {
+          for (size_t yl = 0; yl < split_merge(4).n_rows; yl++) {
             y.row(split_merge(4)(yl, 0)) = split_merge(2).row(yl);
           }
         }
@@ -643,7 +643,7 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
         if (split_merge(0)(0, 0) == 1) {
           // Accept Split and Merge Result:
           // i.e., shift Lambda to Lambda', y to y', and z to z'
-          for (int c = 0; c < split_merge(1).n_rows; c++) {
+          for (size_t c = 0; c < split_merge(1).n_rows; c++) {
             // Shift Lambda to Lambda'
             lambda(split_merge(1)(c, 0))(split_merge(1)(c, 1)) =
                 split_merge(1)(c, 2);
@@ -653,7 +653,7 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
                 split_merge(3).row(c);
           }
           // Shift y to y'
-          for (int yl = 0; yl < split_merge(4).n_rows; yl++) {
+          for (size_t yl = 0; yl < split_merge(4).n_rows; yl++) {
             y.row(split_merge(4)(yl, 0)) = split_merge(2).row(yl);
           }
 

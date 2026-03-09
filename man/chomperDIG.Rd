@@ -19,11 +19,11 @@ chomperDIG(
   hyper_epsilon_discrete = c(),
   hyper_epsilon_continuous = c(),
   hyper_sigma = matrix(nrow = 0, ncol = 2),
-  decaying_upper_bound = 10,
+  decaying_upper_bound = 100,
   n_burnin = 1000,
   n_gibbs = 1000,
   batch_size = 10,
-  n_epochs = 50,
+  n_epochs = 5,
   max_time = 86400,
   batch_update = TRUE
 )

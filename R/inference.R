@@ -809,9 +809,9 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                        hyper_epsilon_discrete = c(),
                        hyper_epsilon_continuous = c(),
                        hyper_sigma = matrix(nrow = 0, ncol = 2),
-                       decaying_upper_bound = 10.0,
+                       decaying_upper_bound = 100.0,
                        n_burnin = 1000, n_gibbs = 1000,
-                       batch_size = 10, n_epochs = 50,
+                       batch_size = 10, n_epochs = 5,
                        max_time = 86400, batch_update = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1

@@ -1137,7 +1137,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
   // 2. MCMC Sampling
   int weight_transition_cycle = n_epochs * N / batch_size;
-  if (weight_transition_cycle > (n_burnin + n_gibbs)) {
+  if (weight_transition_cycle > total_iteration) {
     Rcpp::Rcout
         << "Warning: You need more samples to perform DIG properly. "
            "The weight transition cycle is longer than the total MCMC samples."
@@ -1158,7 +1158,8 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
   double f_weight = 0.0;
   double g_weight = 0.0;
-  arma::vec sampling_weights(N, arma::fill::zeros);
+  arma::vec sampling_weights(N, arma::fill::ones);
+  sampling_weights /= static_cast<double>(N);
   // Discomfort-Informed Adaptive Gibbs Sampler
   for (int imcmc = 0; imcmc < n_burnin; imcmc++) {
     if ((total_mcmc > xi1) & (total_mcmc <= xi2)) {

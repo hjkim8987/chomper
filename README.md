@@ -13,6 +13,7 @@
 
 - **Multiple Inference Approaches**: Implements three inference methods:
   - **MCMC**: Markov Chain Monte Carlo with split and merge process
+  - **DIG**: Discomfort-Informed Adaptive Gibbs Sampler
   - **EVIL**: Evolutionary Variational Inference for record Linkage
   - **CAVI**: Single Coordinate Ascent Variational Inference  
 
@@ -119,6 +120,7 @@ print(perf)
 ### Core Inference Functions
 
 - `chomperMCMC()`: Markov Chain Monte Carlo
+- `chomperDIG()`: Discomfort-Informed Adaptive Gibbs
 - `chomperEVIL()`: Evolutionary Variational Inference for record Linkage
 - `chomperCAVI()`: Coordinate Ascent Variational Inference
 

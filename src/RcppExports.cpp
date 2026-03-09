@@ -119,6 +119,38 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// DIG
+List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size, int n_epochs, double max_time, bool batch_update);
+RcppExport SEXP _chomper_DIG(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP decaying_upper_boundSEXP, SEXP n_burninSEXP, SEXP n_gibbsSEXP, SEXP batch_sizeSEXP, SEXP n_epochsSEXP, SEXP max_timeSEXP, SEXP batch_updateSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< arma::field<arma::mat> >::type x(xSEXP);
+    Rcpp::traits::input_parameter< int >::type k(kSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type n(nSEXP);
+    Rcpp::traits::input_parameter< int >::type N(NSEXP);
+    Rcpp::traits::input_parameter< int >::type p(pSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type discrete_fields(discrete_fieldsSEXP);
+    Rcpp::traits::input_parameter< int >::type n_discrete_fields(n_discrete_fieldsSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type M(MSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type continuous_fields(continuous_fieldsSEXP);
+    Rcpp::traits::input_parameter< int >::type n_continuous_fields(n_continuous_fieldsSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type hyper_beta(hyper_betaSEXP);
+    Rcpp::traits::input_parameter< arma::mat >::type hyper_sigma(hyper_sigmaSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper_phi(hyper_phiSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper_tau(hyper_tauSEXP);
+    Rcpp::traits::input_parameter< arma::vec >::type hyper_delta(hyper_deltaSEXP);
+    Rcpp::traits::input_parameter< double >::type decaying_upper_bound(decaying_upper_boundSEXP);
+    Rcpp::traits::input_parameter< int >::type n_burnin(n_burninSEXP);
+    Rcpp::traits::input_parameter< int >::type n_gibbs(n_gibbsSEXP);
+    Rcpp::traits::input_parameter< int >::type batch_size(batch_sizeSEXP);
+    Rcpp::traits::input_parameter< int >::type n_epochs(n_epochsSEXP);
+    Rcpp::traits::input_parameter< double >::type max_time(max_timeSEXP);
+    Rcpp::traits::input_parameter< bool >::type batch_update(batch_updateSEXP);
+    rcpp_result_gen = Rcpp::wrap(DIG(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, max_time, batch_update));
+    return rcpp_result_gen;
+END_RCPP
+}
 // psm_vi
 arma::mat psm_vi(arma::field<arma::mat> probs_field);
 RcppExport SEXP _chomper_psm_vi(SEXP probs_fieldSEXP) {
@@ -173,6 +205,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_chomper_EvolutionaryVI", (DL_FUNC) &_chomper_EvolutionaryVI, 29},
     {"_chomper_MCMC", (DL_FUNC) &_chomper_MCMC, 24},
     {"_chomper_CoordinateAscentVI", (DL_FUNC) &_chomper_CoordinateAscentVI, 24},
+    {"_chomper_DIG", (DL_FUNC) &_chomper_DIG, 22},
     {"_chomper_psm_vi", (DL_FUNC) &_chomper_psm_vi, 1},
     {"_chomper_psm_mcmc", (DL_FUNC) &_chomper_psm_mcmc, 1},
     {"_chomper_flatten_posterior_samples", (DL_FUNC) &_chomper_flatten_posterior_samples, 3},

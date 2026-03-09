@@ -61,6 +61,33 @@ arma::mat compile_matrix(arma::field<arma::mat> x) {
   return result;
 }
 
+// Construct a vector by appending vectors in a field
+//
+// @param x a field of vectors
+// @return vector version of data
+arma::vec compile_vector(arma::field<arma::vec> x) {
+  int k = x.n_elem;
+
+  int N = 0;
+  for (int i = 0; i < k; i++) {
+    N += x(i).n_elem;
+  }
+
+  arma::vec result(N, arma::fill::zeros);
+  int current_position = 0;
+  for (int i = 0; i < k; i++) {
+    const arma::vec& x_i = x(i);
+    int n_i = x_i.n_elem;
+
+    if (n_i > 0) {
+      result.subvec(current_position, current_position + n_i - 1) = x_i;
+      current_position += n_i;
+    }
+  }
+
+  return result;
+}
+
 // Split a matrix into k matrices by row
 //
 // @param x a matrix
@@ -118,6 +145,27 @@ arma::uvec sample_index(int N, int size) {
 int sample_integer(arma::uvec x) {
   arma::uvec samples = sample_index(x.n_elem, 1);
   return x(samples(0));
+}
+
+// Sample rows from an index matrix based on sampling weights
+//
+// @param index_matrix an index matrix
+// @param sampling_weights a vector of sampling weights
+// @param batch_size size of the sampled matrix
+// @param N total number of records
+// @return a sampled matrix
+arma::mat sample_index_matrix(arma::mat index_matrix,
+                              arma::vec sampling_weights, int batch_size,
+                              int N) {
+  IntegerVector indices = seq(0, N - 1);
+
+  IntegerVector sampled_indices =
+      sample(indices, batch_size, false,
+             NumericVector(sampling_weights.begin(), sampling_weights.end()));
+  arma::uvec arma_indices = as<arma::uvec>(sampled_indices);
+
+  arma::mat sampled_matrix = index_matrix.rows(arma_indices);
+  return sampled_matrix;
 }
 
 // Find the indexes of the maximum values in each row of matrices of a field
@@ -797,4 +845,21 @@ int rcategorical(NumericVector probs, int size) {
 // @return a random number from an inverse gamma distribution
 double rinvgamma(double shape, double scale) {
   return 1.0 / R::rgamma(shape, 1.0 / scale);
+}
+
+// Calculate a density from a Gaussian distribution
+//
+// @param x value for the density
+// @param mu mean
+// @param sd standard deviation
+// @param log if true, returns log(Gaussian(x))
+// @return a density at x
+double gaussian_pdf(double x, double mu, double sd, bool use_log) {
+  double INV_SQRT_2PI = 0.3989422804014327;
+  double z = (x - mu) / sd;
+  if (use_log) {
+    return log(INV_SQRT_2PI / sd) - 0.5 * z * z;
+  } else {
+    return (INV_SQRT_2PI / sd) * exp(-0.5 * z * z);
+  }
 }

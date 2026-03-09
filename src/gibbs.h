@@ -133,4 +133,62 @@ arma::field<arma::mat> do_split_merge(
     arma::field<arma::mat> log_x_probability,
     arma::field<arma::field<arma::mat>> x_in_range, bool sample_y = false);
 
+/**************************************************/
+// For Discomfort-Informed Adaptive Gibbs Sampler
+/**************************************************/
+double get_categorical_loglikelihood(
+    const arma::rowvec& x_ij, const arma::rowvec& y_jprime,
+    const arma::rowvec& z_ij, const arma::field<NumericVector>& log_theta,
+    const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& discrete_fields, int n_discrete_fields);
+
+double get_gaussian_loglikelihood(
+    const arma::rowvec& x_ij, const arma::rowvec& y_jprime,
+    const arma::rowvec& z_ij, const NumericVector& eta,
+    const NumericVector& sigma, const arma::vec& hyper_tau,
+    const arma::vec& continuous_fields, int n_continuous_fields);
+
+arma::field<arma::mat> get_likelihood(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::field<IntegerVector>& lambda,
+    const arma::field<NumericVector>& log_theta, const NumericVector& eta,
+    const NumericVector& sigma, const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& hyper_tau, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, arma::vec n, int N);
+
+arma::field<arma::mat> update_allocation_matrix(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::field<IntegerVector>& lambda,
+    const arma::field<arma::mat>& nu,
+    const arma::field<NumericVector>& log_theta, const NumericVector& eta,
+    const NumericVector& sigma, const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& hyper_tau, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, arma::vec n, int N);
+
+arma::vec calculate_discomfort_probability(
+    const arma::field<arma::mat>& allocation_matrix,
+    const arma::field<IntegerVector>& lambda, int k);
+
+double f_tanh(double t, double s, double a = 1.0);
+double g_tanh(double t, double s, double a = 1.0);
+double f_poly(double t, double s);
+double g_poly(double t, double s);
+
+double calculate_ESS(const arma::vec& discomfort_probability,
+                     double decaying_parameter, double batch_size_double);
+
+double optimize_decaying_parameter(const arma::vec& discomfort_probability,
+                                   double batch_size_double,
+                                   double decaying_upper_bound);
+
+arma::field<arma::mat> update_nu(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, const arma::vec& n, int N,
+    const arma::vec& log_phi_tau, const arma::vec& hyper_delta,
+    const arma::vec& hyper_tau);
+
 #endif

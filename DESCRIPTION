@@ -17,7 +17,8 @@ RoxygenNote: 7.3.2
 LinkingTo: 
     Rcpp,
     RcppArmadillo,
-    RcppThread
+    RcppThread,
+    BH
 Imports:
     Rcpp
 Depends: 

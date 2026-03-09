@@ -908,6 +908,594 @@ List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N,
           round((timer.now() - start_t) / nano * 10000.0) / 10000.0);
 }
 
+// [[Rcpp::export(name = ".DIG")]]
+List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
+         arma::vec discrete_fields, int n_discrete_fields, arma::vec M,
+         arma::vec continuous_fields, int n_continuous_fields,
+         arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi,
+         arma::vec hyper_tau, arma::vec hyper_delta,
+         double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size,
+         int n_epochs, double max_time, bool batch_update) {
+  //// Define empty fields to store MCMC samples
+  // linkage structure
+  arma::field<arma::field<IntegerVector>> lambda_out(n_gibbs);
+  // distortion indicator
+  arma::field<arma::field<arma::mat>> z_out(n_gibbs);
+  // latent true value
+  arma::field<arma::mat> y_out(n_gibbs);
+  // distortion ratio (all)
+  arma::field<NumericVector> beta_out(n_gibbs);
+  // probabilities of true values
+  arma::field<arma::field<NumericVector>> theta_out(n_gibbs);
+  // mean of latent true values
+  arma::field<NumericVector> eta_out(n_gibbs);
+  // variance of latent true values
+  arma::field<NumericVector> sigma_out(n_gibbs);
+
+  // Define empty storage for each iteration
+  arma::field<IntegerVector> lambda(k);
+  arma::field<arma::mat> z(k);
+  arma::mat y(N, p);
+  NumericVector beta(p);
+  arma::field<NumericVector> theta(n_discrete_fields);
+  NumericVector eta(n_continuous_fields);
+  NumericVector sigma(n_continuous_fields);
+
+  NumericVector log_odds(p);
+  arma::field<NumericVector> log_theta(n_discrete_fields);
+
+  // Define xi's for phase transition
+  int total_iteration = n_burnin + n_gibbs;
+  int xi1 = std::floor(total_iteration * 0.25);
+  int xi2 = std::floor(total_iteration * 0.5);
+
+  // Define probabilities for calculating discomfort and actual discomfort.
+  arma::vec discomfort_probability(N);
+  arma::vec discomfort(N);
+
+  // Initialize decaying parameter
+  double decaying_parameter = decaying_upper_bound;
+
+  // Auxiliary index matrix for sampling
+  arma::mat sampling_index = create_index_matrix(k, n);
+
+  // Set timer to check the computation time
+  Timer timer;
+  int nano = 1000000000;
+  double start_t = timer.now();
+  double start_iter;
+
+  bool interrupted = false;
+
+  // 1. Initialization
+  Rcpp::Rcout << "CHOMPER (DIG): Start Initialization..." << std::endl;
+  // 1.1. Define auxiliary values
+  // 1.1.1. Auxiliary index (observations and files) vectors,
+  //        which are used for split and merge steps:
+  // files: file indices
+  // indices: observation indices within each file
+  // entire_index: observation indices for the entire dataset
+  // n_arma: number of observations in each file (type: arma::vec)
+  IntegerVector files = seq(0, k - 1);
+  arma::field<IntegerVector> indices(k);
+  for (int i = 0; i < k; i++) {
+    indices(i) = seq(0, n(i) - 1);
+  }
+  IntegerVector entire_index = seq(0, N - 1);
+  arma::vec n_arma = as<arma::vec>(wrap(n));
+
+  // 1.1.2. Base probability matrix for data:
+  //        (i.e., probability of each discrete data point given each level)
+  arma::field<arma::mat> x_probability(n_discrete_fields);
+  arma::field<arma::mat> log_x_probability(n_discrete_fields);
+  arma::vec log_phi_tau(n_discrete_fields);
+  // For each discrete field,
+  for (int l = 0; l < n_discrete_fields; l++) {
+    // Define phi_{l}^{1 / tau_{l}}, softmax-representation parameter
+    // We should call hyper_tau(discrete_fields(l)), not hyper_tau(l),
+    // because hyper_tau is a vector of length p, not n_discrete_fields
+    log_phi_tau(l) = log(hyper_phi(l)) / hyper_tau(discrete_fields(l));
+
+    // Define probability matrix for each discrete field
+    arma::mat each_probability(M(l), M(l));
+    arma::mat each_log_probability(M(l), M(l));
+    // For each possible level of a categorical variable,
+    for (int m_out = 0; m_out < M(l); m_out++) {
+      // Initialize a probability vector with ones
+      arma::rowvec each_log_level(M(l), arma::fill::zeros);
+      // For each possible level of a categorical variable,
+      for (int m = 0; m < M(l); m++) {
+        // If the |x_{ijl} - m| <= delta_{l},
+        if (abs(m_out - m) <= hyper_delta(l)) {
+          // Multiply log(phi_{l}^{1 / tau_{l}})
+          each_log_level(m) = log_phi_tau(l);
+        }
+      }
+      // Store the probability vector
+      each_probability.row(m_out) = log_softmax(each_log_level, false);
+      each_log_probability.row(m_out) = log_softmax(each_log_level, true);
+    }
+    // Store the probability matrix
+    x_probability(l) = each_probability;
+    log_x_probability(l) = each_log_probability;
+  }
+
+  // 1.1.3. Matrix with indicator of x_{ijl} is in the range of delta_{l},
+  //        which is used for generating y_{j'l}
+  arma::field<arma::field<arma::mat>> x_in_range(k);
+  // For each file,
+  for (int i = 0; i < k; i++) {
+    // Define an empty field of length n_discrete_fields
+    arma::field<arma::mat> file_x_in_range(n_discrete_fields);
+    // For each discrete field,
+    for (int l = 0; l < n_discrete_fields; l++) {
+      // Define an n(i) by M(l) empty matrix to store indicator values
+      // 'm'th column of the matrix corresponds to |x_{ijl} - m| <= delta_{l}
+      arma::mat each_x_in_range(n(i), M(l), arma::fill::zeros);
+      for (int j = 0; j < n(i); j++) {
+        for (int m = 0; m < M(l); m++) {
+          // If the |x_{ijl} - m| <= delta_{l},
+          if (abs(x(i)(j, discrete_fields(l)) - (m + 1)) <= hyper_delta(l)) {
+            // Set the indicator to one
+            each_x_in_range(j, m) = 1;
+          }
+        }
+      }
+      file_x_in_range(l) = each_x_in_range;
+    }
+    x_in_range(i) = file_x_in_range;
+  }
+
+  // 1.2. Initialize parameters
+  // 1.2.1. Linkage structure and corresponding distortion and true values,
+  //        lambda_{ij}, z_{ijl}, y_{j'l}, eta_{l}, and sigma_{l}
+  for (int i = 0; i < k; i++) {
+    // lambda_{ij} ~ constant
+    // As there is no linkage at the beginning,
+    // each x_{ij} is only linked to itself
+    // That is, lambda_{ij} = j' where j' is the exact location of a record,
+    // when all files are binded horizontally.
+    IntegerVector lambda_each(n(i));
+    if (i == 0) {
+      lambda_each = seq(0, n_arma(i) - 1);
+    } else {
+      lambda_each =
+          seq(sum(n_arma.subvec(0, i - 1)), sum(n_arma.subvec(0, i)) - 1);
+    }
+    lambda(i) = lambda_each;
+
+    // z_{ijl} ~ Bernoulli(p_{ijl})
+    // Distortion indicator is initialized to zero,
+    // as we start from the status that there is no linkage among files
+    arma::mat z_each(n(i), p, arma::fill::zeros);
+    z(i) = z_each;
+
+    // y_{j'l} ~ Multinomial(theta_{j'l}), or Normal(eta_{j'l}, sigma_{j'l})
+    // However, we initialize latent records are the same as data
+    if (i == 0) {
+      y.rows(0, n_arma(i) - 1) = x(i);
+    } else {
+      y.rows(sum(n_arma.subvec(0, i - 1)), sum(n_arma.subvec(0, i)) - 1) = x(i);
+    }
+  }
+
+  // theta_{l} ~ Dirichlet(mu_{l}), where mu_{l} is rep(1 / M(l), M(l))
+  arma::field<NumericVector> mu(n_discrete_fields);
+  for (int l = 0; l < n_discrete_fields; l++) {
+    // Initialize theta_{l} with E[prior distribution]
+    NumericVector mu_each((int)(M(l)), 1.0);
+    mu(l) = mu_each;
+
+    theta(l) = mu_each / M(l);
+
+    // log(theta_{l})
+    log_theta(l) = log(theta(l));
+  }
+
+  for (int l = 0; l < n_continuous_fields; l++) {
+    // eta_{l} ~ constant
+    // Initialize eta_{l} with the sample mean of the continuous field
+    eta(l) = mean(y.col(continuous_fields(l)));
+
+    // sigma_{l} ~ Inverse-Gamma(hyper_sigma_{l1}, hyper_sigma_{l2})
+    // Even though sigma_{l} should be initialized with E[prior distribution],
+    // because the expectation is not defined for shape < 1,
+    // we use the sample variance.
+    sigma(l) = var(y.col(continuous_fields(l)));
+  }
+
+  // 1.2.2. Distortion Ratio: beta_{l}
+  // beta_{l} ~ Beta(hyper_beta_{l1}, hyper_beta_{l2})
+  for (int l = 0; l < p; l++) {
+    beta(l) = hyper_beta(l, 0) / (hyper_beta(l, 0) + hyper_beta(l, 1));
+  }
+  // log(beta_{l} / (1.0 - beta_{l}))
+  log_odds = log(beta / (1.0 - beta));
+
+  // 1.3. Initialize allocation matrix
+  // Initial allocation matrix is calculated with the initial parameters.
+  // Before the initialization, we should define initial nu.
+  // 1.3.1. Initialize nu
+  // nu is initialized under the assumption
+  // that each record is equally likely to be linked to any other record.
+  // That is, nu_{ij} = 1 / N for all i, j.
+  // TODO-DIG-1--------------------------------------------------------------*//
+  // Compare with using initial lambda, assigning large values
+  // to the location of initial lambda.
+  //*------------------------------------------------------------------------*//
+  arma::field<arma::mat> nu(k);
+  for (int i = 0; i < k; i++) {
+    nu(i) = arma::mat(n(i), N, arma::fill::ones);
+    nu(i) /= static_cast<double>(N);
+  }
+
+  // 1.3.2. Update (initialize, actually) allocation matrix
+  arma::field<arma::mat> allocation_matrix = update_allocation_matrix(
+      x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability, hyper_tau,
+      discrete_fields, n_discrete_fields, continuous_fields,
+      n_continuous_fields, k, n, N);
+
+  // 2. MCMC Sampling
+  int weight_transition_cycle = n_epochs * N / batch_size;
+  if (weight_transition_cycle > (n_burnin + n_gibbs)) {
+    Rcpp::Rcout
+        << "Warning: You need more samples to perform DIG properly. "
+           "The weight transition cycle is longer than the total MCMC samples."
+        << std::endl;
+    Rcpp::Rcout << "         The weight transition is disabled." << std::endl;
+  }
+
+  Rcpp::Rcout << "MCMC Starts:" << std::endl;
+  // 2.1. Burn-in
+  Rcpp::Rcout << " - Burn-in " << n_burnin << " samples..." << std::endl;
+  start_iter = timer.now();
+  int burnin_term = (int)(n_burnin / 10);
+
+  double batch_size_double = static_cast<double>(batch_size);
+  int total_mcmc = 0;
+  bool tanh_weight = true;
+  int update_cycle = 3;
+
+  double f_weight = 0.0;
+  double g_weight = 0.0;
+  arma::vec sampling_weights(N, arma::fill::zeros);
+  // Discomfort-Informed Adaptive Gibbs Sampler
+  for (int imcmc = 0; imcmc < n_burnin; imcmc++) {
+    if ((total_mcmc > xi1) & (total_mcmc <= xi2)) {
+      update_cycle = 6;
+    } else if (total_mcmc > xi2) {
+      update_cycle = 10;
+    }
+
+    if ((imcmc % update_cycle) == 0) {
+      // Update allocation matrix
+      // First, calculate `nu` using the current samples.
+      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                     continuous_fields, n_continuous_fields, k, n, N,
+                     log_phi_tau, hyper_delta, hyper_tau);
+
+      // Then, update allocation matrix using the current samples
+      allocation_matrix = update_allocation_matrix(
+          x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
+          hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
+          n_continuous_fields, k, n, N);
+    }
+
+    // Every iteration
+    discomfort_probability =
+        calculate_discomfort_probability(allocation_matrix, lambda, k);
+    discomfort = arma::exp(-decaying_parameter * discomfort_probability);
+
+    if (tanh_weight) {
+      decaying_parameter = optimize_decaying_parameter(
+          discomfort_probability, batch_size_double, decaying_upper_bound);
+      f_weight = f_tanh(total_mcmc, n_epochs);
+      g_weight = g_tanh(total_mcmc, n_epochs);
+    } else {
+      decaying_parameter = 1.0;
+      f_weight = f_poly(total_mcmc, n_epochs);
+      g_weight = g_poly(total_mcmc, n_epochs);
+    }
+
+    sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+
+    arma::mat sampled_index =
+        sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
+    for (int cdx = 0; cdx < batch_size; cdx++) {
+      int i = sampled_index(cdx, 0);
+      int j = sampled_index(cdx, 1);
+
+      arma::rowvec weights_ij = allocation_matrix(i).row(j);
+
+      // Update linkage structure lambda_{ij} using allocation matrix
+      lambda(i)(j) =
+          sample(entire_index, 1, false,
+                 NumericVector(weights_ij.begin(), weights_ij.end()))[0];
+    }
+
+    // Sample the rest of the parameters
+    // y, z: the order matters,
+    // because the updated lambda affects the latent records,
+    // and finally the new distortion indicator should be updated
+    // based on the updated latent records.
+    // However, as batch_size lambdas are updated,
+    // we need to sample y_{jprime} for all jprime from new lambda assignments.
+    if (batch_update) {
+      for (int cdx = 0; cdx < batch_size; cdx++) {
+        int i = sampled_index(cdx, 0);
+        int j = sampled_index(cdx, 1);
+        int jprime = lambda(i)(j);
+
+        y.row(jprime) = update_latent_record(
+            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
+            M, p, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, x_in_range);
+
+        z(i).row(j) = update_distortion(
+            x(i).row(j), y.row(jprime), beta, theta, eta, sigma, p,
+            discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, hyper_tau, x_probability);
+      }
+    } else {
+      // Sampling y_{jprime} for all jprime = 1, ..., N
+      for (int jprime = 0; jprime < N; jprime++) {
+        y.row(jprime) = update_latent_record(
+            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
+            M, p, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, x_in_range);
+      }
+
+      // Sampling z_{ij} for all i = 1, ..., k and j = 1, ..., n(i)
+      for (int i = 0; i < k; i++) {
+        for (int j = 0; j < n(i); j++) {
+          z(i).row(j) = update_distortion(
+              x(i).row(j), y.row(lambda(i)(j)), beta, theta, eta, sigma, p,
+              discrete_fields, n_discrete_fields, continuous_fields,
+              n_continuous_fields, hyper_tau, x_probability);
+        }
+      }
+    }
+
+    // Sampling theta_{l}, eta_{l}, sigma_{l}, and beta_{l}
+    for (int l = 0; l < n_discrete_fields; l++) {
+      int ldx = discrete_fields(l);
+
+      // theta_{l} | lambda, z, y, x
+      theta(l) = rtheta_l(mu(l), x, y, z, ldx, k, M(l));
+
+      // log(theta_{l})
+      log_theta(l) = log(theta(l));
+
+      // beta_{l} | z; l = 1, ..., l_1
+      beta(ldx) = rbeta_l(hyper_beta(ldx, 0), hyper_beta(ldx, 1), z, ldx, k, N);
+    }
+
+    for (int l = 0; l < n_continuous_fields; l++) {
+      int ldx = continuous_fields(l);
+      // eta_{l} | y, sigma
+      eta(l) = reta_l(x, z, y.col(ldx), sigma(l), N, ldx, k);
+
+      // sigma_{l} | y, eta
+      sigma(l) =
+          rsigma_l(hyper_sigma.row(l), y.col(ldx), eta(l), x, z, ldx, k, N);
+
+      // beta_{l} | z; l = l_1 + 1, ..., p
+      beta(ldx) = rbeta_l(hyper_beta(ldx, 0), hyper_beta(ldx, 1), z, ldx, k, N);
+    }
+
+    // log(beta_{l} / (1.0 - beta_{l}))
+    log_odds = log(beta / (1.0 - beta));
+
+    total_mcmc += 1;
+
+    if (total_mcmc > weight_transition_cycle) {
+      tanh_weight = false;
+    }
+
+    // Print progress
+    if ((((imcmc % burnin_term) == 0) & (imcmc > 0)) || (imcmc == 1)) {
+      Rcpp::Rcout << "Finished " << imcmc << "/" << n_burnin
+                  << " burnin... (Elapsed Time: "
+                  << round((timer.now() - start_iter) / nano) << " seconds)"
+                  << std::endl;
+    }
+  }
+  int burnin_et = round((timer.now() - start_iter) / nano);
+
+  // 2.2. Main MCMC
+  Rcpp::Rcout << " - Main MCMC " << n_gibbs << " samples..." << std::endl;
+  int save_term = (int)(n_gibbs / 10);
+  int n_sample = 0;
+  start_iter = timer.now();
+  for (int imcmc = 0; imcmc < n_gibbs; imcmc++) {
+    if ((total_mcmc > xi1) & (total_mcmc <= xi2)) {
+      update_cycle = 6;
+    } else if (total_mcmc > xi2) {
+      update_cycle = 10;
+    }
+
+    if ((imcmc % update_cycle) == 0) {
+      // Update allocation matrix
+      // First, calculate `nu` using the current samples.
+      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                     continuous_fields, n_continuous_fields, k, n, N,
+                     log_phi_tau, hyper_delta, hyper_tau);
+
+      // Then, update allocation matrix using the current samples
+      allocation_matrix = update_allocation_matrix(
+          x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
+          hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
+          n_continuous_fields, k, n, N);
+    }
+
+    // Every iteration
+    discomfort_probability =
+        calculate_discomfort_probability(allocation_matrix, lambda, k);
+    discomfort = arma::exp(-decaying_parameter * discomfort_probability);
+
+    if (tanh_weight) {
+      decaying_parameter = optimize_decaying_parameter(
+          discomfort_probability, batch_size_double, decaying_upper_bound);
+      f_weight = f_tanh(total_mcmc, n_epochs);
+      g_weight = g_tanh(total_mcmc, n_epochs);
+    } else {
+      decaying_parameter = 1.0;
+      f_weight = f_poly(total_mcmc, n_epochs);
+      g_weight = g_poly(total_mcmc, n_epochs);
+    }
+
+    sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+
+    arma::mat sampled_index =
+        sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
+    for (int cdx = 0; cdx < batch_size; cdx++) {
+      int i = sampled_index(cdx, 0);
+      int j = sampled_index(cdx, 1);
+
+      arma::rowvec weights_ij = allocation_matrix(i).row(j);
+
+      // Update linkage structure lambda_{ij} using allocation matrix
+      lambda(i)(j) =
+          sample(entire_index, 1, false,
+                 NumericVector(weights_ij.begin(), weights_ij.end()))[0];
+    }
+
+    // Sample the rest of the parameters
+    // y, z: the order matters,
+    // because the updated lambda affects the latent records,
+    // and finally the new distortion indicator should be updated
+    // based on the updated latent records.
+    // However, as batch_size lambdas are updated,
+    // we need to sample y_{jprime} for all jprime from new lambda assignments.
+    if (batch_update) {
+      for (int cdx = 0; cdx < batch_size; cdx++) {
+        int i = sampled_index(cdx, 0);
+        int j = sampled_index(cdx, 1);
+        int jprime = lambda(i)(j);
+
+        y.row(jprime) = update_latent_record(
+            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
+            M, p, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, x_in_range);
+
+        z(i).row(j) = update_distortion(
+            x(i).row(j), y.row(jprime), beta, theta, eta, sigma, p,
+            discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, hyper_tau, x_probability);
+      }
+    } else {
+      // Sampling y_{jprime} for all jprime = 1, ..., N
+      for (int jprime = 0; jprime < N; jprime++) {
+        y.row(jprime) = update_latent_record(
+            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
+            M, p, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, x_in_range);
+      }
+
+      // Sampling z_{ij} for all i = 1, ..., k and j = 1, ..., n(i)
+      for (int i = 0; i < k; i++) {
+        for (int j = 0; j < n(i); j++) {
+          z(i).row(j) = update_distortion(
+              x(i).row(j), y.row(lambda(i)(j)), beta, theta, eta, sigma, p,
+              discrete_fields, n_discrete_fields, continuous_fields,
+              n_continuous_fields, hyper_tau, x_probability);
+        }
+      }
+    }
+
+    // Sampling theta_{l}, eta_{l}, sigma_{l}, and beta_{l}
+    for (int l = 0; l < n_discrete_fields; l++) {
+      int ldx = discrete_fields(l);
+
+      // theta_{l} | lambda, z, y, x
+      theta(l) = rtheta_l(mu(l), x, y, z, ldx, k, M(l));
+
+      // log(theta_{l})
+      log_theta(l) = log(theta(l));
+
+      // beta_{l} | z; l = 1, ..., l_1
+      beta(ldx) = rbeta_l(hyper_beta(ldx, 0), hyper_beta(ldx, 1), z, ldx, k, N);
+    }
+
+    for (int l = 0; l < n_continuous_fields; l++) {
+      int ldx = continuous_fields(l);
+      // eta_{l} | y, sigma
+      eta(l) = reta_l(x, z, y.col(ldx), sigma(l), N, ldx, k);
+
+      // sigma_{l} | y, eta
+      sigma(l) =
+          rsigma_l(hyper_sigma.row(l), y.col(ldx), eta(l), x, z, ldx, k, N);
+
+      // beta_{l} | z; l = l_1 + 1, ..., p
+      beta(ldx) = rbeta_l(hyper_beta(ldx, 0), hyper_beta(ldx, 1), z, ldx, k, N);
+    }
+
+    // log(beta_{l} / (1.0 - beta_{l}))
+    log_odds = log(beta / (1.0 - beta));
+
+    total_mcmc += 1;
+
+    if (total_mcmc > weight_transition_cycle) {
+      tanh_weight = false;
+    }
+
+    // Copy current samples; due to memory allocation issue
+    NumericVector beta_imcmc = clone(beta);
+    arma::field<NumericVector> theta_imcmc(n_discrete_fields);
+    for (int l = 0; l < n_discrete_fields; l++) {
+      theta_imcmc(l) = clone(theta(l));
+    }
+    NumericVector eta_imcmc = clone(eta);
+    NumericVector sigma_imcmc = clone(sigma);
+    arma::mat y_imcmc = y;
+    arma::field<arma::mat> z_imcmc = z;
+    arma::field<IntegerVector> lambda_imcmc(k);
+    for (int i = 0; i < k; i++) {
+      lambda_imcmc(i) = clone(lambda(i));
+    }
+
+    beta_out(imcmc) = beta_imcmc;
+    theta_out(imcmc) = theta_imcmc;
+    eta_out(imcmc) = eta_imcmc;
+    sigma_out(imcmc) = sigma_imcmc;
+    y_out(imcmc) = y_imcmc;
+    z_out(imcmc) = z_imcmc;
+    lambda_out(imcmc) = lambda_imcmc;
+
+    // Print progress
+    if (((imcmc % save_term) == 0) & (imcmc > 0)) {
+      Rcpp::Rcout << "   - Finished " << imcmc << "/" << n_gibbs
+                  << " iteration... (Elapsed Time: "
+                  << round((timer.now() - start_iter) / nano) << " seconds)"
+                  << std::endl;
+    }
+
+    interrupted = ((timer.now() - start_t) / nano) > max_time;
+    if (interrupted) {
+      break;
+    }
+
+    n_sample += 1;
+  }
+  int main_et = round((timer.now() - start_iter) / nano);
+  double total_et = round((timer.now() - start_t) / nano * 10000.0) / 10000.0;
+
+  Rcpp::Rcout << "----------------------------------------" << std::endl;
+  Rcpp::Rcout << "Finished CHOMPER (DIG):" << std::endl;
+  Rcpp::Rcout << " - Total Elapsed Time: " << total_et << " seconds"
+              << std::endl;
+  Rcpp::Rcout << "   - Burn-In: " << burnin_et << " seconds" << std::endl;
+  Rcpp::Rcout << "   - Main MCMC: " << main_et << " seconds" << std::endl;
+
+  return (List::create(
+      Named("lambda") = lambda_out, Named("z") = z_out, Named("y") = y_out,
+      Named("beta") = beta_out, Named("theta") = theta_out,
+      Named("eta") = eta_out, Named("sigma") = sigma_out,
+      Named("n_sample") = n_sample, Named("transition") = !tanh_weight,
+      Named("transition_point") = weight_transition_cycle,
+      Named("elapsed_time") = total_et, Named("interruption") = interrupted));
+}
+
 // Calculate the posterior similarity matrix
 // using the parameters 'nu' of approximated posterior
 // obtained from VI (or EVIL) CHOMPER

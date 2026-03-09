@@ -704,3 +704,223 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     initial_values = initial_values, checkpoint_values = checkpoint_values
   ))
 }
+
+#' @title CHOMPER with Discomfort-Informed Adaptive Gibbs Sampler
+#' @description
+#' Fit the CHOMPER model with Discomfort-Informed Adaptive Gibbs Sampler (DIG) to estimate the linkage structure across multiple datasets.
+#' It returns the posterior samples of the linkage structure and other parameters of the CHOMPER model.
+#'
+#' @param x A list of data frames, each representing a dataset.
+#' @param k The number of datasets to be linked.
+#' @param n The number of rows in each dataset (vector of length k).
+#' @param N The number of columns in each dataset.
+#' @param p The number of fields in each dataset.
+#' @param M The number of categories for each discrete field (vector of length of discrete fields).
+#' @param discrete_fields The indexes of the discrete fields (1-based index).
+#' @param continuous_fields The indexes of the continuous fields (1-based index).
+#' @param hyper_beta The hyperparameters for the beta distribution (matrix of size p x 2).
+#' @param hyper_phi The hyperparameters for softmax representation (vector of length of discrete fields).
+#' @param hyper_tau The temperature parameter (vector of length of discrete fields).
+#' @param hyper_epsilon_discrete The range parameter for the comprehensive hit of discrete fields (vector of length of discrete fields).
+#' @param hyper_epsilon_continuous The range parameter for the comprehensive hit of continuous fields (vector of length of continuous fields).
+#' @param hyper_sigma The hyperparameters for the Inverse Gamma distribution (matrix of size length of continuous fields x 2).
+#' @param decaying_upper_bound The upper bound for the decaying parameter for the discomfort-informed adaptive Gibbs sampler.
+#' @param n_burnin The number of burn-in iterations for the MCMC.
+#' @param n_gibbs The number of Gibbs sampling iterations for the MCMC.
+#' @param batch_size The batch size for the discomfort-informed adaptive Gibbs sampler.
+#' @param n_epochs The number of epochs for the discomfort-informed adaptive Gibbs sampler.
+#' @param max_time The maximum time limit for the execution in seconds.
+#' @param batch_update Whether to update the parameters in a batch.
+#'
+#' @return A list containing the posterior samples.
+#' @return A list of the posterior samples and other information containing:
+#' \itemize{
+#'   \item \code{lambda}: A list of posterior samples (integer vectors) of the linkage structure.
+#'   \item \code{z}: A list of posterior samples (binary matrices) of the distortion indicators.
+#'   \item \code{y}: A list of posterior samples (matrices) of the true latent records.
+#'   \item \code{beta}: A list of posterior samples (numeric vectors) of the distortion ratio.
+#'   \item \code{theta}: A list of posterior samples (numeric vectors) of the probabilities of discrete true latent values.
+#'   \item \code{eta}: A list of posterior samples (numeric vectors) of the mean of continuous true latent values.
+#'   \item \code{sigma}: A list of posterior samples (numeric vectors) of the variance of continuous true latent values.
+#'   \item \code{n_sample}: Total number of posterior samples after burn-in.
+#'   \item \code{elapsed_time}: The elapsed time of the entire MCMC process in seconds.
+#'   \item \code{interruption}: Whether the CHOMPER-DIG is interrupted. The fitting is interrupted if the elapsed time reaches the maximum time limit.
+#' }
+#'
+#' @examples
+#' # 1. Generate sample data for testing
+#' sample_data <- generate_sample_data(
+#'   n_entities = 10,
+#'   n_files = 3,
+#'   overlap_ratio = 0.7,
+#'   discrete_columns = c(1, 2),
+#'   discrete_levels = c(3, 3),
+#'   continuous_columns = c(3, 4),
+#'   continuous_params = matrix(c(0, 0, 1, 1), ncol = 2),
+#'   distortion_ratio = c(0.1, 0.1, 0.1, 0.1)
+#' )
+#'
+#' # 2. Get file information and remove `id` from the original data
+#' n <- numeric(3)
+#' x <- list()
+#' for (i in 1:3) {
+#'   n[i] <- nrow(sample_data[[i]])
+#'   x[[i]] <- sample_data[[i]][, -1]
+#' }
+#' N <- sum(n)
+#'
+#' # 3. Set Hyperparameters
+#' hyper_beta <- matrix(
+#'   rep(c(N * 0.1 * 0.01, N * 0.1), 4),
+#'   ncol = 2, byrow = TRUE
+#' )
+#'
+#' hyper_sigma <- matrix(
+#'   rep(c(0.01, 0.01), 2),
+#'   ncol = 2, byrow = TRUE
+#' )
+#'
+#' # 4. Fit CHOMPER-DIG
+#' result <- chomperDIG(
+#'   x = x,
+#'   k = 3, # number of datasets
+#'   n = n, # rows per dataset
+#'   N = N, # columns per dataset
+#'   p = 4, # fields per dataset
+#'   M = c(3, 3), # categories for discrete fields
+#'   discrete_fields = c(1, 2),
+#'   continuous_fields = c(3, 4),
+#'   hyper_beta = hyper_beta, # hyperparameter for distortion rate
+#'   hyper_sigma = hyper_sigma, # hyperparameter for continuous fields
+#'   hyper_phi = c(2.0, 2.0),
+#'   hyper_tau = c(0.01, 0.01),
+#'   hyper_epsilon_discrete = c(0, 0),
+#'   hyper_epsilon_continuous = c(0.001, 0.001),
+#'   decaying_upper_bound = 10.0,
+#'   n_burnin = 0,
+#'   n_gibbs = 100,
+#'   batch_size = 100,
+#'   n_epochs = 50
+#' )
+#'
+#' @export
+chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
+                       hyper_beta, hyper_phi = c(), hyper_tau = c(),
+                       hyper_epsilon_discrete = c(),
+                       hyper_epsilon_continuous = c(),
+                       hyper_sigma = matrix(nrow = 0, ncol = 2),
+                       decaying_upper_bound = 10.0,
+                       n_burnin = 1000, n_gibbs = 1000,
+                       batch_size = 10, n_epochs = 50,
+                       max_time = 86400, batch_update = TRUE) {
+  # Convert the field indexes to 0-based indexing
+  discrete_fields <- discrete_fields - 1
+  continuous_fields <- continuous_fields - 1
+
+  if (any(discrete_fields == -1)) {
+    n_discrete_fields <- 0
+  } else {
+    n_discrete_fields <- length(discrete_fields)
+  }
+
+  if (any(continuous_fields == -1)) {
+    n_continuous_fields <- 0
+  } else {
+    n_continuous_fields <- length(continuous_fields)
+  }
+
+  if ((length(x) != k) || (length(n) != k)) {
+    stop("Check the number of files")
+  }
+
+  n_cols <- numeric(k)
+  n_rows <- numeric(k)
+  for (i in 1:k) {
+    n_cols[i] <- ncol(x[[i]])
+    n_rows[i] <- nrow(x[[i]])
+  }
+
+  if (any(n_cols != p)) {
+    stop("Check the number of columns in each file")
+  }
+
+  if (any(n_rows != n)) {
+    stop("Check the number of rows in each file")
+  }
+
+  if (length(M) != n_discrete_fields) {
+    stop("Check the number of discrete fields")
+  }
+
+  if (nrow(hyper_sigma) != n_continuous_fields) {
+    stop("Check the number of continuous fields")
+  }
+
+  if ((n_discrete_fields + n_continuous_fields) != p) {
+    stop("Check the number of fields")
+  }
+
+  if ((nrow(hyper_beta) != p) || (ncol(hyper_beta) != 2)) {
+    stop("Check the dimension of hyperparameters")
+  }
+
+  if (length(hyper_phi) != n_discrete_fields) {
+    print("Warning: hyperparameter (phi) is not provided properly.")
+    print("         The default value, (2.0, ..., 2.0), is used.")
+    hyper_phi <- rep(2.0, n_discrete_fields)
+  }
+
+  if (length(hyper_tau) != n_discrete_fields) {
+    print("Warning: hyperparameter (tau) is not provided properly.")
+    print("         The default value, (0.01, ..., 0.01), is used.")
+    hyper_tau <- rep(0.01, n_discrete_fields)
+  }
+
+  if (length(hyper_epsilon_discrete) != n_discrete_fields) {
+    print("Warning: hyperparameter (hitting range for discrete fields) is not provided properly.")
+    print("         The default value, (0, ..., 0) is used.")
+    hyper_epsilon_discrete <- rep(0, n_discrete_fields)
+  }
+
+  if (length(hyper_epsilon_continuous) != n_continuous_fields) {
+    print("Warning: hyperparameter (hitting range for continuous fields) is not provided properly.")
+    print("         The default value, (0.001, ..., 0.001), is used.")
+    hyper_epsilon_continuous <- rep(0.001, n_continuous_fields)
+  }
+
+  temperature_parameter <- numeric(p)
+  for (li in 1:n_discrete_fields) {
+    temperature_parameter[discrete_fields[li] + 1] <- hyper_tau[li]
+  }
+  for (li in 1:n_continuous_fields) {
+    temperature_parameter[continuous_fields[li] + 1] <- hyper_epsilon_continuous[li]
+  }
+
+  if (nrow(hyper_sigma) != n_continuous_fields) {
+    print("Warning: hyperparameter (sigma) is not provided properly.")
+    print("         The default value, Inv-Gamma(0.01, 0.01) is used.")
+    hyper_sigma <-
+      matrix(
+        rep(c(0.01, 0.01), n_continuous_fields),
+        ncol = 2, byrow = TRUE
+      )
+  }
+
+  # if (custom_initializer && use_checkpoint) {
+  #   stop("Checkpoint and Custom Initializer cannot be used at the same time.")
+  # }
+
+  return(.DIG(
+    x = x, k = k, n = n, N = N, p = p,
+    discrete_fields = discrete_fields,
+    n_discrete_fields = n_discrete_fields,
+    M = M, continuous_fields = continuous_fields,
+    n_continuous_fields = n_continuous_fields,
+    hyper_beta = hyper_beta, hyper_sigma = hyper_sigma,
+    hyper_phi = hyper_phi, hyper_tau = temperature_parameter,
+    hyper_delta = hyper_epsilon_discrete,
+    decaying_upper_bound = decaying_upper_bound,
+    n_burnin = n_burnin, n_gibbs = n_gibbs, batch_size = batch_size,
+    n_epochs = n_epochs, max_time = max_time, batch_update = batch_update
+  ))
+}

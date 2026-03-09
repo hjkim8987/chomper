@@ -16,6 +16,8 @@ arma::mat create_combination(int n, int start = 0);
 
 arma::mat compile_matrix(arma::field<arma::mat> x);
 
+arma::vec compile_vector(arma::field<arma::vec> x);
+
 arma::field<arma::mat> split_matrix(arma::mat x, arma::vec n, int k);
 
 arma::mat create_index_matrix(int k, arma::vec n);
@@ -23,6 +25,10 @@ arma::mat create_index_matrix(int k, arma::vec n);
 arma::uvec sample_index(int N, int size);
 
 int sample_integer(arma::uvec x);
+
+arma::mat sample_index_matrix(arma::mat index_matrix,
+                              arma::vec sampling_weights, int batch_size,
+                              int N);
 
 arma::field<arma::uvec> find_max_indexes(arma::field<arma::mat> probs, int k,
                                          arma::vec n);
@@ -107,5 +113,7 @@ NumericVector rdirichlet(NumericVector alpha);
 int rcategorical(NumericVector probs, int size);
 
 double rinvgamma(double shape, double scale);
+
+double gaussian_pdf(double x, double mu, double sd, bool use_log = false);
 
 #endif

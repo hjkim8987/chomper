@@ -1,8 +1,12 @@
 #include <RcppArmadillo.h>
 
+#include <boost/math/tools/minima.hpp>
+#include <limits>
+
 #include "gibbs.h"
 
 // [[Rcpp::depends(RcppArmadillo)]]
+// [[Rcpp::depends(BH)]]
 
 using namespace Rcpp;
 
@@ -755,3 +759,267 @@ arma::field<arma::mat> do_split_merge(
 
   return split_merge;
 }
+
+/**************************************************/
+// For Discomfort-Informed Adaptive Gibbs Sampler
+/**************************************************/
+double get_categorical_loglikelihood(
+    const arma::rowvec& x_ij, const arma::rowvec& y_jprime,
+    const arma::rowvec& z_ij, const arma::field<NumericVector>& log_theta,
+    const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& discrete_fields, int n_discrete_fields) {
+  double loglikelihood = 0.0;
+
+  // For all categorical fields in a record,
+  for (int l = 0; l < n_discrete_fields; l++) {
+    int ldx = static_cast<int>(discrete_fields(l));
+    int y_idx = static_cast<int>(y_jprime(ldx)) - 1;
+
+    // Multiply likelihood based on the current MCMC sample
+    if (z_ij(ldx) == 1) {
+      loglikelihood += log_theta(l)(y_idx);
+    } else {
+      int x_idx = static_cast<int>(x_ij(ldx)) - 1;
+      loglikelihood += log_x_probability(l)(y_idx, x_idx);
+    }
+  }
+
+  return loglikelihood;
+}
+
+double get_gaussian_loglikelihood(
+    const arma::rowvec& x_ij, const arma::rowvec& y_jprime,
+    const arma::rowvec& z_ij, const NumericVector& eta,
+    const NumericVector& sigma, const arma::vec& hyper_tau,
+    const arma::vec& continuous_fields, int n_continuous_fields) {
+  double loglikelihood = 0.0;
+
+  // For all Gaussian fields in a record,
+  for (int l = 0; l < n_continuous_fields; l++) {
+    int ldx = static_cast<int>(continuous_fields(l));
+
+    // Multiply likelihood based on the current MCMC sample
+    if (z_ij(ldx) == 1) {
+      loglikelihood += gaussian_pdf(x_ij(ldx), eta(l), sqrt(sigma(l)), true);
+    } else {
+      loglikelihood +=
+          gaussian_pdf(x_ij(ldx), y_jprime(ldx), sqrt(hyper_tau(ldx)), true);
+    }
+  }
+
+  return loglikelihood;
+}
+
+arma::field<arma::mat> get_likelihood(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::field<IntegerVector>& lambda,
+    const arma::field<NumericVector>& log_theta, const NumericVector& eta,
+    const NumericVector& sigma, const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& hyper_tau, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, arma::vec n, int N) {
+  arma::field<arma::mat> all_likelihood(k);
+
+  for (int i = 0; i < k; i++) {
+    const arma::mat& x_i = x(i);
+    const arma::mat& z_i = z(i);
+    int n_i = n(i);
+
+    arma::mat each_likelihood(n_i, N);
+    for (int j = 0; j < n_i; j++) {
+      const arma::rowvec& x_ij = x_i.row(j);
+      const arma::rowvec& z_ij = z_i.row(j);
+
+      for (int jprime = 0; jprime < N; jprime++) {
+        const arma::rowvec& y_jprime = y.row(jprime);
+        double val = 0.0;
+
+        val += get_categorical_loglikelihood(x_ij, y_jprime, z_ij, log_theta,
+                                             log_x_probability, discrete_fields,
+                                             n_discrete_fields);
+        val += get_gaussian_loglikelihood(x_ij, y_jprime, z_ij, eta, sigma,
+                                          hyper_tau, continuous_fields,
+                                          n_continuous_fields);
+
+        each_likelihood(j, jprime) = exp(val);
+      }
+    }
+    all_likelihood(i) = each_likelihood;
+  }
+
+  return all_likelihood;
+}
+
+arma::field<arma::mat> update_allocation_matrix(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::field<IntegerVector>& lambda,
+    const arma::field<arma::mat>& nu,
+    const arma::field<NumericVector>& log_theta, const NumericVector& eta,
+    const NumericVector& sigma, const arma::field<arma::mat>& log_x_probability,
+    const arma::vec& hyper_tau, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, arma::vec n, int N) {
+  arma::field<arma::mat> allocation_field(k);
+
+  arma::field<arma::mat> all_likelihood =
+      get_likelihood(x, y, z, lambda, log_theta, eta, sigma, log_x_probability,
+                     hyper_tau, discrete_fields, n_discrete_fields,
+                     continuous_fields, n_continuous_fields, k, n, N);
+
+  for (int i = 0; i < k; i++) {
+    arma::mat allocation_matrix = nu(i) % all_likelihood(i);
+    arma::vec denominator = sum(allocation_matrix, 1);
+
+    allocation_matrix.each_col() /= denominator;
+
+    allocation_field(i) = allocation_matrix;
+  }
+
+  return allocation_field;
+}
+
+// A function to calculate discomfort probability for each file.
+// However, this function returns an N_max by 1 vector for the convenience.
+arma::vec calculate_discomfort_probability(
+    const arma::field<arma::mat>& allocation_matrix,
+    const arma::field<IntegerVector>& lambda, int k) {
+  arma::field<arma::vec> discomfort(k);
+
+  for (int i = 0; i < k; i++) {
+    const arma::mat& allocation_matrix_i = allocation_matrix(i);
+    int n_row = allocation_matrix_i.n_rows;
+
+    arma::uvec col_indices = as<arma::uvec>(lambda(i));
+    // arma::uvec col_indices = arma::conv_to<arma::uvec>::from(lambda(i));
+    arma::uvec row_indices = arma::regspace<arma::uvec>(0, n_row - 1);
+
+    arma::uvec linear_index = row_indices + (col_indices * n_row);
+
+    discomfort(i) = allocation_matrix_i.elem(linear_index);
+  }
+
+  return compile_vector(discomfort);
+}
+
+double f_tanh(double t, double s, double a) {
+  return 0.5 * (1.0 + tanh((t - s) / a));
+}
+
+double g_tanh(double t, double s, double a) {
+  return 0.5 * (1.0 - tanh((t - s) / a));
+}
+
+double f_poly(double t, double s) { return (t - s + 1.0) / (t - s + 2.0); }
+double g_poly(double t, double s) { return 1.0 / (t - s + 2.0); }
+
+double calculate_ESS(const arma::vec& discomfort_probability,
+                     double decaying_parameter, double batch_size_double) {
+  arma::vec exp_p = arma::exp(-decaying_parameter * discomfort_probability);
+  double sum_exp_p = arma::sum(exp_p);
+
+  // sum(exp(-decaying_parameter * p))^2
+  double numerator = sum_exp_p * sum_exp_p;
+
+  // sum(exp(-2 * decaying_parameter * p))
+  double denominator = arma::sum(arma::square(exp_p));
+
+  return (numerator / denominator) - batch_size_double;
+}
+
+double optimize_decaying_parameter(const arma::vec& discomfort_probability,
+                                   double batch_size_double,
+                                   double decaying_upper_bound) {
+  auto ess_func =
+      [&discomfort_probability, batch_size_double](double lambda) {
+        return calculate_ESS(discomfort_probability, lambda, batch_size_double);
+      };
+
+  const int bits = std::numeric_limits<double>::digits;
+
+  // Find the optimal decaying parameter using Brent's method
+  // between [1, decaying_upper_bound]
+  std::pair<double, double> result = boost::math::tools::brent_find_minima(
+      ess_func, 1.0, decaying_upper_bound, bits);
+
+  return result.first;
+}
+
+arma::field<arma::mat> update_nu(
+    const arma::field<arma::mat>& x, const arma::mat& y,
+    const arma::field<arma::mat>& z, const arma::vec& discrete_fields,
+    int n_discrete_fields, const arma::vec& continuous_fields,
+    int n_continuous_fields, int k, const arma::vec& n, int N,
+    const arma::vec& log_phi_tau, const arma::vec& hyper_delta,
+    const arma::vec& hyper_tau) {
+  arma::field<arma::mat> nu(k);
+
+  arma::uvec discrete_index = arma::conv_to<arma::uvec>::from(discrete_fields);
+  arma::uvec continuous_index =
+      arma::conv_to<arma::uvec>::from(continuous_fields);
+
+  arma::mat y_discrete;
+  if (n_discrete_fields > 0) {
+    y_discrete = y.cols(discrete_index);
+  }
+
+  arma::mat y_continuous_t;
+  arma::mat y_continuous_squared_t;
+  arma::rowvec inv_neg2_tau;
+  if (n_continuous_fields > 0) {
+    const arma::mat y_continuous = y.cols(continuous_index);
+    y_continuous_t = y_continuous.t();
+    y_continuous_squared_t = arma::square(y_continuous).t();
+    inv_neg2_tau = -0.5 / hyper_tau.elem(continuous_index).t();
+  }
+
+  for (int i = 0; i < k; i++) {
+    const arma::mat& x_i = x(i);
+    const arma::mat& z_i = z(i);
+    int n_i = static_cast<int>(n(i));
+
+    arma::mat log_nu_i(n_i, N, arma::fill::zeros);
+
+    // Discrete fields;
+    // Add log_phi_tau_l if the |x_il - y_l| <= delta and z_il = 0
+    for (int l = 0; l < n_discrete_fields; l++) {
+      int ldx = discrete_index(l);
+      double delta = hyper_delta(l);
+      double log_phi_tau_l = log_phi_tau(l);
+
+      arma::vec x_il = x_i.col(ldx);
+      arma::vec weights = (1.0 - z_i.col(ldx)) * log_phi_tau_l;
+
+      for (int jprime = 0; jprime < N; jprime++) {
+        double y_jprimel = y_discrete(jprime, l);
+
+        for (int j = 0; j < n_i; j++) {
+          if (std::abs(x_il(j) - y_jprimel) <= delta) {
+            log_nu_i(j, jprime) += weights(j);
+          }
+        }
+      }
+    }
+
+    // Continuous fields; w(x - y)^2 = wx^2 - 2wxy + wy^2
+    if (n_continuous_fields > 0) {
+      arma::mat x_continuous = x_i.cols(continuous_index);
+      arma::mat z_continuous = z_i.cols(continuous_index);
+
+      arma::mat z_diff = 1.0 - z_continuous;
+      arma::mat weights = z_diff.each_row() % inv_neg2_tau;
+
+      arma::mat wx = weights % x_continuous;
+      arma::vec wx2 = arma::sum(wx % x_continuous, 1);
+
+      log_nu_i.each_col() += wx2;
+      log_nu_i += weights * y_continuous_squared_t - 2.0 * wx * y_continuous_t;
+    }
+
+    arma::mat nu_i = arma::exp(log_nu_i);
+    nu_i.each_col() /= arma::sum(nu_i, 1);
+
+    nu(i) = nu_i;
+  }
+
+  return nu;
+};

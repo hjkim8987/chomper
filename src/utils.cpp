@@ -337,6 +337,15 @@ double log_sum_exp(NumericVector x) {
   return log(lse) + max_x;
 }
 
+// Calculate the log-sum-exp of a vector (Armadillo)
+//
+// @param x a vector
+// @return the log-sum-exp of the vector
+double log_sum_exp(arma::vec x) {
+  double max_x = arma::max(x);
+  return max_x + log(arma::sum(arma::exp(x - max_x)));
+}
+
 // Calculate the log-sum-exp of a row vector (Armadillo)
 //
 // @param x a row vector

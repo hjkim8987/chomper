@@ -176,12 +176,11 @@ double g_tanh(double t, double s, double a = 1.0);
 double f_poly(double t, double s);
 double g_poly(double t, double s);
 
-double calculate_ESS(const arma::vec& discomfort_probability,
-                     double decaying_parameter, double batch_size_double);
+double calculate_ESS(const arma::vec& discomfort_probability, double lambda,
+                     double m);
 
 double optimize_decaying_parameter(const arma::vec& discomfort_probability,
-                                   double batch_size_double,
-                                   double decaying_upper_bound);
+                                   double m, double decaying_upper_bound);
 
 arma::field<arma::mat> update_nu(
     const arma::field<arma::mat>& x, const arma::mat& y,

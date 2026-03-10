@@ -1,6 +1,6 @@
 #include <RcppArmadillo.h>
 
-#include <boost/math/tools/minima.hpp>
+#include <boost/math/tools/roots.hpp>
 #include <limits>
 
 #include "gibbs.h"
@@ -912,36 +912,57 @@ double g_tanh(double t, double s, double a) {
 double f_poly(double t, double s) { return (t - s + 1.0) / (t - s + 2.0); }
 double g_poly(double t, double s) { return 1.0 / (t - s + 2.0); }
 
-double calculate_ESS(const arma::vec& discomfort_probability,
-                     double decaying_parameter, double batch_size_double) {
-  arma::vec exp_p = arma::exp(-decaying_parameter * discomfort_probability);
-  double sum_exp_p = arma::sum(exp_p);
+double calculate_ESS(const arma::vec& discomfort_probability, double lambda,
+                     double m) {
+  arma::vec arg = -lambda * discomfort_probability;
+  double arg_max = arg.max();
 
-  // sum(exp(-decaying_parameter * p))^2
-  double numerator = sum_exp_p * sum_exp_p;
+  // Avoiding overflow by shifting the argument
+  arma::vec shifted = arma::exp(arg - arg_max);
 
-  // sum(exp(-2 * decaying_parameter * p))
-  double denominator = arma::sum(arma::square(exp_p));
+  // sum(exp(arg - arg_max))
+  double sum1 = arma::sum(shifted);
 
-  return (numerator / denominator) - batch_size_double;
+  // sum(exp(2 * (arg - arg_max)))
+  double sum2 = arma::dot(shifted, shifted);
+
+  // ESS = (sum(exp(arg - arg_max))^2) / sum(exp(2 * (arg - arg_max)))
+  double ess = (sum1 * sum1) / sum2;
+
+  // Return ESS - m;
+  // Root-finder is to find the value of lambda that makes ESS = m
+  return ess - m;
 }
 
 double optimize_decaying_parameter(const arma::vec& discomfort_probability,
-                                   double batch_size_double,
-                                   double decaying_upper_bound) {
-  auto ess_func =
-      [&discomfort_probability, batch_size_double](double lambda) {
-        return calculate_ESS(discomfort_probability, lambda, batch_size_double);
-      };
+                                   double m, double decaying_upper_bound) {
+  // Define the target function
+  auto f = [&discomfort_probability, m](double lambda) {
+    return calculate_ESS(discomfort_probability, lambda, m);
+  };
 
-  const int bits = std::numeric_limits<double>::digits;
+  double lower_bound = 1.0;
+  double upper_bound = decaying_upper_bound;
 
-  // Find the optimal decaying parameter using Brent's method
-  // between [1, decaying_upper_bound]
-  std::pair<double, double> result = boost::math::tools::brent_find_minima(
-      ess_func, 1.0, decaying_upper_bound, bits);
+  // Check the function values at the endpoints to avoid errors
+  double f_lower = f(lower_bound);
+  double f_upper = f(upper_bound);
 
-  return result.first;
+  // bounded interval [1, Lambda]
+  if (f_lower <= 0.0) return lower_bound;
+  if (f_upper >= 0.0) return upper_bound;
+
+  // maximum number of iterations
+  std::uintmax_t max_iter = 100;
+  // tolerance (usually half of the double precision)
+  auto tol = boost::math::tools::eps_tolerance<double>(
+      std::numeric_limits<double>::digits - 2);
+
+  // Find the optimal decaying parameter using TOMS 748
+  auto result = boost::math::tools::toms748_solve(
+      f, lower_bound, upper_bound, f_lower, f_upper, tol, max_iter);
+
+  return 0.5 * (result.first + result.second);
 }
 
 arma::field<arma::mat> update_nu(

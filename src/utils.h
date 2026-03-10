@@ -53,6 +53,8 @@ String convert_pair_to_string(int i, int j);
 
 double log_sum_exp(NumericVector x);
 
+double log_sum_exp(arma::vec x);
+
 double log_sum_exp(arma::rowvec x);
 
 NumericVector log_softmax(NumericVector x, bool log = true);

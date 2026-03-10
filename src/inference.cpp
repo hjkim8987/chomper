@@ -948,6 +948,8 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   int total_iteration = n_burnin + n_gibbs;
   int xi1 = std::floor(total_iteration * 0.25);
   int xi2 = std::floor(total_iteration * 0.5);
+  // TODO: Change xi3 using CLL moving average
+  int xi3 = std::floor(total_iteration * 0.75);
 
   // Define probabilities for calculating discomfort and actual discomfort.
   arma::vec discomfort_probability(N);
@@ -1160,6 +1162,10 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   double g_weight = 0.0;
   arma::vec sampling_weights(N, arma::fill::ones);
   sampling_weights /= static_cast<double>(N);
+
+  bool uniform_weight = false;
+  arma::vec uniform_weights(N, arma::fill::ones);
+  uniform_weights /= static_cast<double>(N);
   // Discomfort-Informed Adaptive Gibbs Sampler
   for (int imcmc = 0; imcmc < n_burnin; imcmc++) {
     if ((total_mcmc > xi1) & (total_mcmc <= xi2)) {
@@ -1168,37 +1174,40 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       update_cycle = 10;
     }
 
-    if ((imcmc % update_cycle) == 0) {
-      // Update allocation matrix
-      // First, calculate `nu` using the current samples.
-      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
-                     continuous_fields, n_continuous_fields, k, n, N,
-                     log_phi_tau, hyper_delta, hyper_tau);
+    // Calculate `nu` using the current samples.
+    nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                   continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
+                   hyper_delta, hyper_tau);
 
-      // Then, update allocation matrix using the current samples
-      allocation_matrix = update_allocation_matrix(
-          x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
-          hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
-          n_continuous_fields, k, n, N);
-    }
-
-    // Every iteration
-    discomfort_probability =
-        calculate_discomfort_probability(allocation_matrix, lambda, k);
-    discomfort = arma::exp(-decaying_parameter * discomfort_probability);
-
-    if (tanh_weight) {
-      decaying_parameter = optimize_decaying_parameter(
-          discomfort_probability, batch_size_double, decaying_upper_bound);
-      f_weight = f_tanh(total_mcmc, n_epochs);
-      g_weight = g_tanh(total_mcmc, n_epochs);
+    if (uniform_weight) {
+      sampling_weights = uniform_weights;
     } else {
-      decaying_parameter = 1.0;
-      f_weight = f_poly(total_mcmc, n_epochs);
-      g_weight = g_poly(total_mcmc, n_epochs);
-    }
+      // Update allocation matrix
+      if ((imcmc % update_cycle) == 0) {
+        allocation_matrix = update_allocation_matrix(
+            x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
+            hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, k, n, N);
+      }
 
-    sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+      // Every iteration
+      discomfort_probability =
+          calculate_discomfort_probability(allocation_matrix, lambda, k);
+      discomfort = arma::exp(-decaying_parameter * discomfort_probability);
+
+      if (tanh_weight) {
+        decaying_parameter = optimize_decaying_parameter(
+            discomfort_probability, batch_size_double, decaying_upper_bound);
+        f_weight = f_tanh(total_mcmc, n_epochs);
+        g_weight = g_tanh(total_mcmc, n_epochs);
+      } else {
+        decaying_parameter = 1.0;
+        f_weight = f_poly(total_mcmc, n_epochs);
+        g_weight = g_poly(total_mcmc, n_epochs);
+      }
+
+      sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+    }
 
     arma::mat sampled_index =
         sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
@@ -1206,7 +1215,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       int i = sampled_index(cdx, 0);
       int j = sampled_index(cdx, 1);
 
-      arma::rowvec weights_ij = allocation_matrix(i).row(j);
+      arma::rowvec weights_ij = nu(i).row(j);
 
       // Update linkage structure lambda_{ij} using allocation matrix
       lambda(i)(j) =
@@ -1291,6 +1300,11 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     if (total_mcmc > weight_transition_cycle) {
       tanh_weight = false;
+    }
+
+    // TODO: Change this condition using CLL moving average
+    if (total_mcmc > xi3) {
+      uniform_weight = true;
     }
 
     // Print progress
@@ -1315,37 +1329,40 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       update_cycle = 10;
     }
 
-    if ((imcmc % update_cycle) == 0) {
-      // Update allocation matrix
-      // First, calculate `nu` using the current samples.
-      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
-                     continuous_fields, n_continuous_fields, k, n, N,
-                     log_phi_tau, hyper_delta, hyper_tau);
+    // Calculate `nu` using the current samples.
+    nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                   continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
+                   hyper_delta, hyper_tau);
 
-      // Then, update allocation matrix using the current samples
-      allocation_matrix = update_allocation_matrix(
-          x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
-          hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
-          n_continuous_fields, k, n, N);
-    }
-
-    // Every iteration
-    discomfort_probability =
-        calculate_discomfort_probability(allocation_matrix, lambda, k);
-    discomfort = arma::exp(-decaying_parameter * discomfort_probability);
-
-    if (tanh_weight) {
-      decaying_parameter = optimize_decaying_parameter(
-          discomfort_probability, batch_size_double, decaying_upper_bound);
-      f_weight = f_tanh(total_mcmc, n_epochs);
-      g_weight = g_tanh(total_mcmc, n_epochs);
+    if (uniform_weight) {
+      sampling_weights = uniform_weights;
     } else {
-      decaying_parameter = 1.0;
-      f_weight = f_poly(total_mcmc, n_epochs);
-      g_weight = g_poly(total_mcmc, n_epochs);
-    }
+      // Update allocation matrix
+      if ((imcmc % update_cycle) == 0) {
+        allocation_matrix = update_allocation_matrix(
+            x, y, z, lambda, nu, log_theta, eta, sigma, log_x_probability,
+            hyper_tau, discrete_fields, n_discrete_fields, continuous_fields,
+            n_continuous_fields, k, n, N);
+      }
 
-    sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+      // Every iteration
+      discomfort_probability =
+          calculate_discomfort_probability(allocation_matrix, lambda, k);
+      discomfort = arma::exp(-decaying_parameter * discomfort_probability);
+
+      if (tanh_weight) {
+        decaying_parameter = optimize_decaying_parameter(
+            discomfort_probability, batch_size_double, decaying_upper_bound);
+        f_weight = f_tanh(total_mcmc, n_epochs);
+        g_weight = g_tanh(total_mcmc, n_epochs);
+      } else {
+        decaying_parameter = 1.0;
+        f_weight = f_poly(total_mcmc, n_epochs);
+        g_weight = g_poly(total_mcmc, n_epochs);
+      }
+
+      sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
+    }
 
     arma::mat sampled_index =
         sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
@@ -1353,7 +1370,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       int i = sampled_index(cdx, 0);
       int j = sampled_index(cdx, 1);
 
-      arma::rowvec weights_ij = allocation_matrix(i).row(j);
+      arma::rowvec weights_ij = nu(i).row(j);
 
       // Update linkage structure lambda_{ij} using allocation matrix
       lambda(i)(j) =
@@ -1438,6 +1455,11 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     if (total_mcmc > weight_transition_cycle) {
       tanh_weight = false;
+    }
+
+    // TODO: Change this condition using CLL moving average
+    if (total_mcmc > xi3) {
+      uniform_weight = true;
     }
 
     // Copy current samples; due to memory allocation issue

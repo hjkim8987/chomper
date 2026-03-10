@@ -26,13 +26,13 @@ chomperEVIL(
   max_iter_cavi = 100,
   tol_evi = 1e-05,
   max_iter_evi = 50,
-  verbose = 1,
   n_threads = 1,
   max_time = 86400,
   custom_initializer = FALSE,
   use_checkpoint = FALSE,
   initial_values = NULL,
-  checkpoint_values = NULL
+  checkpoint_values = NULL,
+  verbose_internal = TRUE
 )
 }
 \arguments{
@@ -78,8 +78,6 @@ chomperEVIL(
 
 \item{max_iter_evi}{The maximum number of iterations for the evolutionary variational inference.}
 
-\item{verbose}{The verbosity level. 0: no output, 1: output the EVIL progress, 2: output the EVIL and CAVI progress.}
-
 \item{n_threads}{The number of threads for parallel computation.}
 
 \item{max_time}{The maximum time limit for the execution in seconds.}
@@ -91,6 +89,8 @@ chomperEVIL(
 \item{initial_values}{The initial values for the parameters (optional).}
 
 \item{checkpoint_values}{The checkpoint values for the parameters (optional).}
+
+\item{verbose_internal}{Whether to print the internal C++ messages (TRUE: print, FALSE: not print).}
 }
 \value{
 A list of the approximated parameters of the variational factors and other information containing:
@@ -116,7 +116,6 @@ A list of the approximated parameters of the variational factors and other infor
 \description{
 Fit the CHOMPER model with Evolutionary Variational Inference for record linkage (EVIL) to estimate the linkage structure across multiple datasets.
 It returns the approximate variational factors of the linkage structure that maximize the evidence lower bound (ELBO) and other parameters of the CHOMPER model.
-See Kim et al. (2026) for more details.
 }
 \examples{
 # 1. Generate sample data for testing

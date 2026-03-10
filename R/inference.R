@@ -2,7 +2,6 @@
 #' @description
 #' Fit the CHOMPER model with Evolutionary Variational Inference for record linkage (EVIL) to estimate the linkage structure across multiple datasets.
 #' It returns the approximate variational factors of the linkage structure that maximize the evidence lower bound (ELBO) and other parameters of the CHOMPER model.
-#' See Kim et al. (2026) for more details.
 #'
 #' @param x A list of data frames, each representing a dataset.
 #' @param k The number of datasets to be linked.
@@ -25,13 +24,13 @@
 #' @param max_iter_cavi The maximum number of iterations for the coordinate ascent variational inference.
 #' @param tol_evi The tolerance for the evolutionary variational inference for the convergence.
 #' @param max_iter_evi The maximum number of iterations for the evolutionary variational inference.
-#' @param verbose The verbosity level. 0: no output, 1: output the EVIL progress, 2: output the EVIL and CAVI progress.
 #' @param n_threads The number of threads for parallel computation.
 #' @param max_time The maximum time limit for the execution in seconds.
 #' @param custom_initializer Whether to use a custom initializer for the initial values.
 #' @param use_checkpoint Whether to use a checkpoint.
 #' @param initial_values The initial values for the parameters (optional).
 #' @param checkpoint_values The checkpoint values for the parameters (optional).
+#' @param verbose_internal Whether to print the internal C++ messages (TRUE: print, FALSE: not print).
 #'
 #' @return A list of the approximated parameters of the variational factors and other information containing:
 #' \itemize{
@@ -112,10 +111,10 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                         hyper_sigma = matrix(nrow = 0, ncol = 2),
                         overlap_prob = 0.5, n_parents = 5, n_children = 10,
                         tol_cavi = 1e-5, max_iter_cavi = 100, tol_evi = 1e-5,
-                        max_iter_evi = 50, verbose = 1, n_threads = 1,
+                        max_iter_evi = 50, n_threads = 1,
                         max_time = 86400, custom_initializer = FALSE,
                         use_checkpoint = FALSE, initial_values = NULL,
-                        checkpoint_values = NULL) {
+                        checkpoint_values = NULL, verbose_internal = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1
   continuous_fields <- continuous_fields - 1
@@ -168,26 +167,34 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (length(hyper_phi) != n_discrete_fields) {
-    print("Warning: hyperparameter (phi) is not provided properly.")
-    print("         The default value, (2.0, ..., 2.0), is used.")
+    warning(
+      "hyperparameter (phi) is not provided properly. ",
+      "The default value, (2.0, ..., 2.0), is used."
+    )
     hyper_phi <- rep(2.0, n_discrete_fields)
   }
 
   if (length(hyper_tau) != n_discrete_fields) {
-    print("Warning: hyperparameter (tau) is not provided properly.")
-    print("         The default value, (0.01, ..., 0.01), is used.")
+    warning(
+      "hyperparameter (tau) is not provided properly. ",
+      "The default value, (0.01, ..., 0.01), is used."
+    )
     hyper_tau <- rep(0.01, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_discrete) != n_discrete_fields) {
-    print("Warning: hyperparameter (hitting range for discrete fields) is not provided properly.")
-    print("         The default value, (0, ..., 0) is used.")
+    warning(
+      "hyperparameter (hitting range for discrete fields) is not provided properly. ",
+      "The default value, (0, ..., 0) is used."
+    )
     hyper_epsilon_discrete <- rep(0, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_continuous) != n_continuous_fields) {
-    print("Warning: hyperparameter (hitting range for continuous fields) is not provided properly.")
-    print("         The default value, (0.001, ..., 0.001), is used.")
+    warning(
+      "hyperparameter (hitting range for continuous fields) is not provided properly. ",
+      "The default value, (0.001, ..., 0.001), is used."
+    )
     hyper_epsilon_continuous <- rep(0.001, n_continuous_fields)
   }
 
@@ -200,8 +207,10 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (nrow(hyper_sigma) != n_continuous_fields) {
-    print("Warning: hyperparameter (sigma) is not provided properly.")
-    print("         The default value, Inv-Gamma(0.01, 0.01) is used.")
+    warning(
+      "hyperparameter (sigma) is not provided properly. ",
+      "The default value, Inv-Gamma(0.01, 0.01) is used."
+    )
     hyper_sigma <-
       matrix(
         rep(c(0.01, 0.01), n_continuous_fields),
@@ -224,7 +233,7 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     hyper_delta = hyper_epsilon_discrete, overlap_prob = overlap_prob,
     n_parents = n_parents, n_children = n_children,
     tol_cavi = tol_cavi, max_iter_cavi = max_iter_cavi,
-    tol_evi = tol_evi, max_iter_evi = max_iter_evi, verbose = verbose,
+    tol_evi = tol_evi, max_iter_evi = max_iter_evi, verbose = verbose_internal,
     n_threads = n_threads, max_time = max_time,
     custom_initializer = custom_initializer, use_checkpoint = use_checkpoint,
     initial_values = initial_values, checkpoint_values = checkpoint_values
@@ -235,7 +244,6 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #' @description
 #' Fit the CHOMPER model with Markov chain Monte Carlo (MCMC) with split and merge process to estimate the linkage structure across multiple datasets.
 #' It returns the posterior samples of the linkage structure and other parameters of the CHOMPER model.
-#' See Kim et al. (2026) for more details.
 #'
 #' @param x A list of data frames, each representing a dataset.
 #' @param k The number of datasets to be linked.
@@ -259,6 +267,7 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #' @param use_checkpoint Whether to use a checkpoint.
 #' @param initial_values The initial values for the parameters (optional).
 #' @param checkpoint_values The checkpoint values for the parameters (optional).
+#' @param verbose_internal Whether to print the internal C++ messages (TRUE: print, FALSE: not print).
 #'
 #' @return A list containing the posterior samples.
 #' @return A list of the posterior samples and other information containing:
@@ -309,7 +318,7 @@ chomperEVIL <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #'   ncol = 2, byrow = TRUE
 #' )
 #'
-#' # 4. Fit CHOMPER-CAVI
+#' # 4. Fit CHOMPER-MCMC
 #' result <- chomperMCMC(
 #'   x = x,
 #'   k = 3, # number of datasets
@@ -338,7 +347,7 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                         n_burnin = 1000, n_gibbs = 1000, n_split_merge = 10,
                         max_time = 86400, custom_initializer = FALSE,
                         use_checkpoint = FALSE, initial_values = NULL,
-                        checkpoint_values = NULL) {
+                        checkpoint_values = NULL, verbose_internal = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1
   continuous_fields <- continuous_fields - 1
@@ -391,26 +400,34 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (length(hyper_phi) != n_discrete_fields) {
-    print("Warning: hyperparameter (phi) is not provided properly.")
-    print("         The default value, (2.0, ..., 2.0), is used.")
+    warning(
+      "hyperparameter (phi) is not provided properly. ",
+      "The default value, (2.0, ..., 2.0), is used."
+    )
     hyper_phi <- rep(2.0, n_discrete_fields)
   }
 
   if (length(hyper_tau) != n_discrete_fields) {
-    print("Warning: hyperparameter (tau) is not provided properly.")
-    print("         The default value, (0.01, ..., 0.01), is used.")
+    warning(
+      "hyperparameter (tau) is not provided properly. ",
+      "The default value, (0.01, ..., 0.01), is used."
+    )
     hyper_tau <- rep(0.01, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_discrete) != n_discrete_fields) {
-    print("Warning: hyperparameter (hitting range for discrete fields) is not provided properly.")
-    print("         The default value, (0, ..., 0) is used.")
+    warning(
+      "hyperparameter (hitting range for discrete fields) is not provided properly. ",
+      "The default value, (0, ..., 0) is used."
+    )
     hyper_epsilon_discrete <- rep(0, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_continuous) != n_continuous_fields) {
-    print("Warning: hyperparameter (hitting range for continuous fields) is not provided properly.")
-    print("         The default value, (0.001, ..., 0.001), is used.")
+    warning(
+      "hyperparameter (hitting range for continuous fields) is not provided properly. ",
+      "The default value, (0.001, ..., 0.001), is used."
+    )
     hyper_epsilon_continuous <- rep(0.001, n_continuous_fields)
   }
 
@@ -423,8 +440,10 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (nrow(hyper_sigma) != n_continuous_fields) {
-    print("Warning: hyperparameter (sigma) is not provided properly.")
-    print("         The default value, Inv-Gamma(0.01, 0.01) is used.")
+    warning(
+      "hyperparameter (sigma) is not provided properly. ",
+      "The default value, Inv-Gamma(0.01, 0.01) is used."
+    )
     hyper_sigma <-
       matrix(
         rep(c(0.01, 0.01), n_continuous_fields),
@@ -446,6 +465,7 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     hyper_phi = hyper_phi, hyper_tau = temperature_parameter,
     hyper_delta = hyper_epsilon_discrete, n_burnin = n_burnin,
     n_gibbs = n_gibbs, n_split_merge = n_split_merge,
+    verbose = verbose_internal,
     max_time = max_time, custom_initializer = custom_initializer,
     use_checkpoint = use_checkpoint, initial_values = initial_values,
     checkpoint_values = checkpoint_values
@@ -457,7 +477,6 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #' @description
 #' Fit the CHOMPER model with a single Coordinate Ascent Variational Inference (CAVI) to estimate the linkage structure across multiple datasets.
 #' It returns the approximate variational factors of the linkage structure that maximize the evidence lower bound (ELBO) and other parameters of the CHOMPER model.
-#' See Kim et al. (2026) for more details.
 #'
 #' @param x A list of data frames, each representing a dataset.
 #' @param k The number of datasets to be linked.
@@ -476,12 +495,12 @@ chomperMCMC <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #' @param overlap_prob The presumed probability of overlap across the datasets.
 #' @param tol_cavi The tolerance for the coordinate ascent variational inference for the convergence.
 #' @param max_iter_cavi The maximum number of iterations for the coordinate ascent variational inference.
-#' @param verbose The verbosity level. 0: no output, 1: output the CAVI progress.
 #' @param max_time The maximum time limit for the execution in seconds.
 #' @param custom_initializer Whether to use a custom initializer for the initial values.
 #' @param use_checkpoint Whether to use a checkpoint.
 #' @param initial_values The initial values for the parameters (optional).
 #' @param checkpoint_values The checkpoint values for the parameters (optional).
+#' @param verbose_internal Whether to print the internal C++ messages (TRUE: print, FALSE: not print).
 #'
 #' @return A list of the approximated parameters of the variational factors and other information containing:
 #' \itemize{
@@ -560,9 +579,9 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                         hyper_epsilon_discrete = c(), hyper_epsilon_continuous = c(),
                         hyper_sigma = matrix(nrow = 0, ncol = 2),
                         overlap_prob = 0.5, tol_cavi = 1e-5, max_iter_cavi = 100,
-                        verbose = 1, max_time = 86400, custom_initializer = FALSE,
+                        max_time = 86400, custom_initializer = FALSE,
                         use_checkpoint = FALSE, initial_values = NULL,
-                        checkpoint_values = NULL) {
+                        checkpoint_values = NULL, verbose_internal = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1
   continuous_fields <- continuous_fields - 1
@@ -615,26 +634,34 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (length(hyper_phi) != n_discrete_fields) {
-    print("Warning: hyperparameter (phi) is not provided properly.")
-    print("         The default value, (2.0, ..., 2.0), is used.")
+    warning(
+      "hyperparameter (phi) is not provided properly. ",
+      "The default value, (2.0, ..., 2.0), is used."
+    )
     hyper_phi <- rep(2.0, n_discrete_fields)
   }
 
   if (length(hyper_tau) != n_discrete_fields) {
-    print("Warning: hyperparameter (tau) is not provided properly.")
-    print("         The default value, (0.01, ..., 0.01), is used.")
+    warning(
+      "hyperparameter (tau) is not provided properly. ",
+      "The default value, (0.01, ..., 0.01), is used."
+    )
     hyper_tau <- rep(0.01, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_discrete) != n_discrete_fields) {
-    print("Warning: hyperparameter (hitting range for discrete fields) is not provided properly.")
-    print("         The default value, (0, ..., 0) is used.")
+    warning(
+      "hyperparameter (hitting range for discrete fields) is not provided properly. ",
+      "The default value, (0, ..., 0) is used."
+    )
     hyper_epsilon_discrete <- rep(0, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_continuous) != n_continuous_fields) {
-    print("Warning: hyperparameter (hitting range for continuous fields) is not provided properly.")
-    print("         The default value, (0.001, ..., 0.001), is used.")
+    warning(
+      "hyperparameter (hitting range for continuous fields) is not provided properly. ",
+      "The default value, (0.001, ..., 0.001), is used."
+    )
     hyper_epsilon_continuous <- rep(0.001, n_continuous_fields)
   }
 
@@ -647,8 +674,10 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (nrow(hyper_sigma) != n_continuous_fields) {
-    print("Warning: hyperparameter (sigma) is not provided properly.")
-    print("         The default value, Inv-Gamma(0.01, 0.01) is used.")
+    warning(
+      "hyperparameter (sigma) is not provided properly. ",
+      "The default value, Inv-Gamma(0.01, 0.01) is used."
+    )
     hyper_sigma <-
       matrix(
         rep(c(0.01, 0.01), n_continuous_fields),
@@ -670,7 +699,7 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     hyper_phi = hyper_phi, hyper_tau = temperature_parameter,
     hyper_delta = hyper_epsilon_discrete, overlap_prob = overlap_prob,
     tol_cavi = tol_cavi, max_iter_cavi = max_iter_cavi,
-    verbose = verbose + 1, max_time = max_time,
+    verbose = verbose_internal, max_time = max_time,
     custom_initializer = custom_initializer, use_checkpoint = use_checkpoint,
     initial_values = initial_values, checkpoint_values = checkpoint_values
   ))

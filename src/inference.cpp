@@ -19,7 +19,7 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
                     arma::vec hyper_tau, arma::vec hyper_delta,
                     double overlap_prob, int n_parents, int n_children,
                     double tol_cavi, int max_iter_cavi, double tol_evi,
-                    int max_iter_evi, int verbose, int n_threads,
+                    int max_iter_evi, bool verbose, int n_threads,
                     double max_time, bool custom_initializer,
                     bool use_checkpoint, Nullable<List> initial_values,
                     Nullable<List> checkpoint_values) {
@@ -45,7 +45,9 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
   // Main iterative optimization
   double start_iter = timer.now();
-  Rcpp::Rcout << "Start Evolutionary Variational Inference..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "Start Evolutionary Variational Inference..." << std::endl;
+  }
 
   NumericVector ELBO_best;
   int niter = 0;
@@ -55,10 +57,12 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   if (custom_initializer) {
     // lambda_{ij} are prespecified based on the domain knowledge.
     if (initial_values.isNull()) {
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
-      Rcpp::Rcout << "         Discard the current results. -" << std::endl;
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
+        Rcpp::Rcout << "         Discard the current results. -" << std::endl;
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+      }
 
       return (List::create(Named("error") = "No initial values provided"));
     }
@@ -67,16 +71,20 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       data, n_parents, overlap_prob, custom_initializer, initial_values);
 
   if (use_checkpoint) {
-    Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
-    Rcpp::Rcout << " - Overriding previous approximations as initial values..."
-                << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
+      Rcpp::Rcout
+          << " - Overriding previous approximations as initial values..."
+          << std::endl;
+    }
 
     if (checkpoint_values.isNull()) {
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
-      Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-
+      if (verbose) {
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
+        Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+      }
       return (List::create(Named("error") = "No checkpoint values provided"));
     }
 
@@ -105,9 +113,11 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       P0[i].setApproximatedEtaVar(chckpt_each["eta_var"]);
       P0[i].setApproximatedRho(chckpt_each["rho"]);
     }
-    Rcpp::Rcout << " - Finished loading checkpoint..." << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << " - Finished loading checkpoint..." << std::endl;
+    }
   }
-  if (verbose > 0) {
+  if (verbose) {
     Rcpp::Rcout << "Finished Generating the Initial Population of size "
                 << n_parents << std::endl;
   }
@@ -127,12 +137,12 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   bool interrupted = false;
 
   while (!converged) {
-    if (verbose > 0) Rcpp::Rcout << "#(Iteration) = " << niter + 1 << std::endl;
+    if (verbose) Rcpp::Rcout << "#(Iteration) = " << niter + 1 << std::endl;
 
     // 2. Update: P_0 -> P_1
     std::vector<OptimMember> P1 =
         update_step(P0, tol_cavi, max_iter_cavi, verbose, n_threads);
-    if (verbose > 0) Rcpp::Rcout << "Finished the First Update" << std::endl;
+    if (verbose) Rcpp::Rcout << "Finished the First Update" << std::endl;
 
     for (int o = 0; o < n_parents; o++) {
       if (P1[o].getElapsedTime() > maximum_elapsed_time) {
@@ -143,12 +153,12 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     // 3. Crossover: P_1 -> P_2
     std::vector<OptimMember> P2 =
         crossover_step(P1, combination_matrix, n_combination, n_children);
-    if (verbose > 0) Rcpp::Rcout << "Finished Crossover Step" << std::endl;
+    if (verbose) Rcpp::Rcout << "Finished Crossover Step" << std::endl;
 
     // 4. Update: P_2 -> P_3
     std::vector<OptimMember> P3 =
         update_step(P2, tol_cavi, max_iter_cavi, verbose, n_threads);
-    if (verbose > 0) Rcpp::Rcout << "Finished the Second Update" << std::endl;
+    if (verbose) Rcpp::Rcout << "Finished the Second Update" << std::endl;
 
     for (int o = 0; o < n_children; o++) {
       if (P3[o].getElapsedTime() > maximum_elapsed_time) {
@@ -158,12 +168,11 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // 5. Select: P_1 U P_3 -> P_4
     std::vector<OptimMember> P4 = selection_step(P1, P3, n_parents, n_children);
-    if (verbose > 0)
-      Rcpp::Rcout << "Finished Selecting Population" << std::endl;
+    if (verbose) Rcpp::Rcout << "Finished Selecting Population" << std::endl;
 
     // 6. Mutate P_4 -> P_5
     std::vector<OptimMember> P5 = mutation_step(P4, n_parents, n_threads);
-    if (verbose > 0) Rcpp::Rcout << "Finished Mutation Step" << std::endl;
+    if (verbose) Rcpp::Rcout << "Finished Mutation Step" << std::endl;
 
     // 6. Check convergence
     // Extract the best-performing model
@@ -175,9 +184,11 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     sim_prob_new = psm.col(2);
 
     if (niter > 0) {
-      Rcpp::Rcout << "Generation #" << niter + 1
-                  << ", Current ELBO: " << ELBO_best[niter]
-                  << ", Previous ELBO: " << ELBO_best[niter - 1] << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "Generation #" << niter + 1
+                    << ", Current ELBO: " << ELBO_best[niter]
+                    << ", Previous ELBO: " << ELBO_best[niter - 1] << std::endl;
+      }
 
       elbo_flag = std::fabs((ELBO_best[niter] - ELBO_best[niter - 1]) /
                             ELBO_best[niter - 1]) < tol_evi;
@@ -219,11 +230,14 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
         chckpt_vector.push_back(chckpt_each);
       }
 
-      Rcpp::Rcout << "- Stop Evolutionary CAVI due to the interruption:"
-                  << std::endl;
-      Rcpp::Rcout << "   Running time reached time limit." << std::endl;
-      Rcpp::Rcout << "  - Save a checkpoint and resume the optimization later."
-                  << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "- Stop Evolutionary CAVI due to the interruption:"
+                    << std::endl;
+        Rcpp::Rcout << "   Running time reached time limit." << std::endl;
+        Rcpp::Rcout
+            << "  - Save a checkpoint and resume the optimization later."
+            << std::endl;
+      }
 
       return List::create(
           Named("checkpoint") = chckpt_vector, Named("ELBO") = ELBO_best,
@@ -233,18 +247,20 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
               round((timer.now() - start_t) / nano * 10000.0) / 10000.0);
     }
 
-    if (verbose > 1) {
+    if (verbose) {
       Rcpp::Rcout << "Finished " << niter << "th iteration... (Elapsed Time: "
                   << round((timer.now() - start_iter) / nano) << " seconds)"
                   << std::endl;
     }
   }
 
-  Rcpp::Rcout << "- Finished Evolutionary CAVI:" << std::endl;
-  Rcpp::Rcout << "  - Total Number of Iteration: " << niter << std::endl;
-  Rcpp::Rcout << "  - Total Elapsed Time: "
-              << round((timer.now() - start_t) / nano) << " seconds"
-              << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "- Finished Evolutionary CAVI:" << std::endl;
+    Rcpp::Rcout << "  - Total Number of Iteration: " << niter << std::endl;
+    Rcpp::Rcout << "  - Total Elapsed Time: "
+                << round((timer.now() - start_t) / nano) << " seconds"
+                << std::endl;
+  }
 
   NumericVector ELBO_output;
   if (elbo_decreasing) {
@@ -283,9 +299,9 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
           arma::vec continuous_fields, int n_continuous_fields,
           arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi,
           arma::vec hyper_tau, arma::vec hyper_delta, int n_burnin, int n_gibbs,
-          int n_split_merge, double max_time, bool custom_initializer,
-          bool use_checkpoint, Nullable<List> initial_values,
-          Nullable<List> checkpoint_values) {
+          int n_split_merge, bool verbose, double max_time,
+          bool custom_initializer, bool use_checkpoint,
+          Nullable<List> initial_values, Nullable<List> checkpoint_values) {
   //// Define empty fields to store MCMC samples
   // linkage structure
   arma::field<arma::field<IntegerVector>> lambda_out(n_gibbs);
@@ -330,7 +346,9 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   bool sample_y = false;
 
   // 1. Initialization
-  Rcpp::Rcout << "CHOMPER (MCMC): Start Initialization..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "CHOMPER (MCMC): Start Initialization..." << std::endl;
+  }
   // 1.1. Define auxiliary values
   // 1.1.1. Auxiliary index (observations and files) vectors,
   //        which are used for split and merge steps:
@@ -415,11 +433,12 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     // lambda_{ij} are prespecified based on the domain knowledge,
     // and their corresponding z and y are also given.
     if (initial_values.isNull()) {
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
-      Rcpp::Rcout << "         Discard the current results. -" << std::endl;
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
-
+      if (verbose) {
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
+        Rcpp::Rcout << "         Discard the current results. -" << std::endl;
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+      }
       return (List::create(Named("error") = "No initial values provided"));
     }
 
@@ -508,16 +527,19 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   log_odds = log(beta / (1.0 - beta));
 
   if (use_checkpoint) {
-    Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
-    Rcpp::Rcout << " - Overriding previous MCMC samples as initial values..."
-                << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
+      Rcpp::Rcout << " - Overriding previous MCMC samples as initial values..."
+                  << std::endl;
+    }
 
     if (checkpoint_values.isNull()) {
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
-      Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-
+      if (verbose) {
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
+        Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+      }
       return (List::create(Named("error") = "No checkpoint values provided"));
     }
     List chckpt_values;
@@ -545,9 +567,12 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   }
 
   // 2. MCMC Sampling
-  Rcpp::Rcout << "MCMC Starts:" << std::endl;
+  if (verbose) Rcpp::Rcout << "MCMC Starts:" << std::endl;
+
   // 2.1. Burn-in
-  Rcpp::Rcout << " - Burn-in " << n_burnin << " samples..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << " - Burn-in " << n_burnin << " samples..." << std::endl;
+  }
   start_iter = timer.now();
   int burnin_term = (int)(n_burnin / 10);
   // Gibbs Sampler within Metropolis-Hastings
@@ -616,16 +641,20 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // Print progress
     if ((((imcmc % burnin_term) == 0) & (imcmc > 0)) || (imcmc == 1)) {
-      Rcpp::Rcout << "Finished " << imcmc << "/" << n_burnin
-                  << " burnin... (Elapsed Time: "
-                  << round((timer.now() - start_iter) / nano) << " seconds)"
-                  << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "Finished " << imcmc << "/" << n_burnin
+                    << " burnin... (Elapsed Time: "
+                    << round((timer.now() - start_iter) / nano) << " seconds)"
+                    << std::endl;
+      }
     }
   }
   int burnin_et = round((timer.now() - start_iter) / nano);
 
   // 2.2. Main MCMC
-  Rcpp::Rcout << " - Main MCMC " << n_gibbs << " samples..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << " - Main MCMC " << n_gibbs << " samples..." << std::endl;
+  }
   int save_term = (int)(n_gibbs / 10);
   int n_shift = 0;
   int n_sample = 0;
@@ -719,10 +748,12 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // Print progress
     if (((imcmc % save_term) == 0) & (imcmc > 0)) {
-      Rcpp::Rcout << "   - Finished " << imcmc << "/" << n_gibbs
-                  << " iteration... (Elapsed Time: "
-                  << round((timer.now() - start_iter) / nano) << " seconds)"
-                  << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "   - Finished " << imcmc << "/" << n_gibbs
+                    << " iteration... (Elapsed Time: "
+                    << round((timer.now() - start_iter) / nano) << " seconds)"
+                    << std::endl;
+      }
     }
 
     interrupted = ((timer.now() - start_t) / nano) > max_time;
@@ -735,12 +766,14 @@ List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   int main_et = round((timer.now() - start_iter) / nano);
   double total_et = round((timer.now() - start_t) / nano * 10000.0) / 10000.0;
 
-  Rcpp::Rcout << "----------------------------------------" << std::endl;
-  Rcpp::Rcout << "Finished CHOMPER (MCMC):" << std::endl;
-  Rcpp::Rcout << " - Total Elapsed Time: " << total_et << " seconds"
-              << std::endl;
-  Rcpp::Rcout << "   - Burn-In: " << burnin_et << " seconds" << std::endl;
-  Rcpp::Rcout << "   - Main MCMC: " << main_et << " seconds" << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "----------------------------------------" << std::endl;
+    Rcpp::Rcout << "Finished CHOMPER (MCMC):" << std::endl;
+    Rcpp::Rcout << " - Total Elapsed Time: " << total_et << " seconds"
+                << std::endl;
+    Rcpp::Rcout << "   - Burn-In: " << burnin_et << " seconds" << std::endl;
+    Rcpp::Rcout << "   - Main MCMC: " << main_et << " seconds" << std::endl;
+  }
 
   return (List::create(
       Named("lambda") = lambda_out, Named("z") = z_out, Named("y") = y_out,
@@ -758,7 +791,7 @@ List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N,
                         arma::mat hyper_sigma, arma::vec hyper_phi,
                         arma::vec hyper_tau, arma::vec hyper_delta,
                         double overlap_prob, double tol_cavi, int max_iter_cavi,
-                        int verbose, double max_time, bool custom_initializer,
+                        bool verbose, double max_time, bool custom_initializer,
                         bool use_checkpoint, Nullable<List> initial_values,
                         Nullable<List> checkpoint_values) {
   Timer timer;
@@ -779,8 +812,10 @@ List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N,
                    hyper_sigma, hyper_phi, hyper_tau, hyper_delta);
 
   // Main iterative optimization
-  Rcpp::Rcout << "Start Coordinate Ascent Variational Inference..."
-              << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "Start Coordinate Ascent Variational Inference..."
+                << std::endl;
+  }
 
   double sampling_prob = R::runif(0.0, overlap_prob);
   data.setSamplingProb(sampling_prob);
@@ -789,27 +824,32 @@ List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N,
   if (custom_initializer) {
     // lambda_{ij} are prespecified based on the domain knowledge.
     if (initial_values.isNull()) {
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
-      Rcpp::Rcout << "         Discard the current results. -" << std::endl;
-      Rcpp::Rcout << "---------------------------------------" << std::endl;
-
+      if (verbose) {
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No initial values provided;   " << std::endl;
+        Rcpp::Rcout << "         Discard the current results. -" << std::endl;
+        Rcpp::Rcout << "---------------------------------------" << std::endl;
+      }
       return (List::create(Named("error") = "No initial values provided"));
     }
   }
   data.initialize(custom_initializer, initial_values);
 
   if (use_checkpoint) {
-    Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
-    Rcpp::Rcout << " - Overriding previous approximations as initial values..."
-                << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << " - Loading checkpoint..." << std::endl;
+      Rcpp::Rcout
+          << " - Overriding previous approximations as initial values..."
+          << std::endl;
+    }
 
     if (checkpoint_values.isNull()) {
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-      Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
-      Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
-      Rcpp::Rcout << "----------------------------------------" << std::endl;
-
+      if (verbose) {
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+        Rcpp::Rcout << "- ERROR: No checkpoint values provided; " << std::endl;
+        Rcpp::Rcout << "         Discard the current results.  -" << std::endl;
+        Rcpp::Rcout << "----------------------------------------" << std::endl;
+      }
       return (List::create(Named("error") = "No checkpoint values provided"));
     }
 
@@ -830,20 +870,24 @@ List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N,
     data.setApproximatedEtaVar(chckpt_values["eta_var"]);
     data.setApproximatedRho(chckpt_values["rho"]);
 
-    Rcpp::Rcout << " - Finished loading checkpoint..." << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << " - Finished loading checkpoint..." << std::endl;
+    }
   }
-  if (verbose > 0) {
+  if (verbose) {
     Rcpp::Rcout << "Finished Initialization..." << std::endl;
   }
 
   data.cavi(tol_cavi, max_iter_cavi, verbose, max_time);
 
-  Rcpp::Rcout << "- Finished Simple CAVI:" << std::endl;
-  Rcpp::Rcout << "  - Total Number of Iteration: "
-              << data.getNumberOfIterations() << std::endl;
-  Rcpp::Rcout << "  - Total Elapsed Time: "
-              << round((timer.now() - start_t) / nano) << " seconds"
-              << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "- Finished Simple CAVI:" << std::endl;
+    Rcpp::Rcout << "  - Total Number of Iteration: "
+                << data.getNumberOfIterations() << std::endl;
+    Rcpp::Rcout << "  - Total Elapsed Time: "
+                << round((timer.now() - start_t) / nano) << " seconds"
+                << std::endl;
+  }
 
   return List::create(
       Named("nu") = data.getApproximatedNu(),

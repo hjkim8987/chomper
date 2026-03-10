@@ -157,7 +157,7 @@ hyper_sigma <- matrix(
 hyper_beta <- matrix(
   rep(c(N_max * 0.1 * 0.01, N_max * 0.1), p),
   ncol = 2, byrow = TRUE
-) # prior distribution for distortion rate, following Marchant et al. (2021)
+) # prior distribution for distortion rate
 ```
 
 ## Step 3. Posterior Estimation

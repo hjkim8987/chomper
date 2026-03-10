@@ -22,12 +22,12 @@ chomperCAVI(
   overlap_prob = 0.5,
   tol_cavi = 1e-05,
   max_iter_cavi = 100,
-  verbose = 1,
   max_time = 86400,
   custom_initializer = FALSE,
   use_checkpoint = FALSE,
   initial_values = NULL,
-  checkpoint_values = NULL
+  checkpoint_values = NULL,
+  verbose_internal = TRUE
 )
 }
 \arguments{
@@ -65,8 +65,6 @@ chomperCAVI(
 
 \item{max_iter_cavi}{The maximum number of iterations for the coordinate ascent variational inference.}
 
-\item{verbose}{The verbosity level. 0: no output, 1: output the CAVI progress.}
-
 \item{max_time}{The maximum time limit for the execution in seconds.}
 
 \item{custom_initializer}{Whether to use a custom initializer for the initial values.}
@@ -76,6 +74,8 @@ chomperCAVI(
 \item{initial_values}{The initial values for the parameters (optional).}
 
 \item{checkpoint_values}{The checkpoint values for the parameters (optional).}
+
+\item{verbose_internal}{Whether to print the internal C++ messages (TRUE: print, FALSE: not print).}
 }
 \value{
 A list of the approximated parameters of the variational factors and other information containing:
@@ -101,7 +101,6 @@ A list of the approximated parameters of the variational factors and other infor
 \description{
 Fit the CHOMPER model with a single Coordinate Ascent Variational Inference (CAVI) to estimate the linkage structure across multiple datasets.
 It returns the approximate variational factors of the linkage structure that maximize the evidence lower bound (ELBO) and other parameters of the CHOMPER model.
-See Kim et al. (2026) for more details.
 }
 \examples{
 # 1. Generate sample data for testing

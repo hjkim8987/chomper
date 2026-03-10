@@ -5,8 +5,8 @@
     .Call(`_chomper_EvolutionaryVI`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, overlap_prob, n_parents, n_children, tol_cavi, max_iter_cavi, tol_evi, max_iter_evi, verbose, n_threads, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values)
 }
 
-.MCMC <- function(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values) {
-    .Call(`_chomper_MCMC`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values)
+.MCMC <- function(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, verbose, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values) {
+    .Call(`_chomper_MCMC`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, verbose, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values)
 }
 
 .CoordinateAscentVI <- function(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, overlap_prob, tol_cavi, max_iter_cavi, verbose, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values) {

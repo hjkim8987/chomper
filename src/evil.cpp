@@ -471,7 +471,8 @@ void OptimMember::coordinate_ascent() {
       n_continuous_fields);
 }
 
-void OptimMember::cavi(double eps, int max_iter, int verbose, double max_time) {
+void OptimMember::cavi(double eps, int max_iter, bool verbose,
+                       double max_time) {
   Timer timer;
   int nano = 1e9;
   double start_t = timer.now();
@@ -482,10 +483,6 @@ void OptimMember::cavi(double eps, int max_iter, int verbose, double max_time) {
   double elbo_diff;
 
   // Main iterative optimization
-  if (verbose > 1) {
-    Rcpp::Rcout << "Start Coordinate Ascent Variational Inference...\n";
-  }
-
   int niter = 0;
 
   double start_iter = timer.now();
@@ -501,17 +498,6 @@ void OptimMember::cavi(double eps, int max_iter, int verbose, double max_time) {
     elbo_t0 = elbo_t1;
 
     niter += 1;
-    if (verbose > 2) {
-      if (niter == 1) {
-        Rcpp::Rcout << "Finished " << niter << "st iteration... (Elapsed Time: "
-                    << round((timer.now() - start_iter) / nano) << " seconds)"
-                    << std::endl;
-      } else if ((niter % 10) == 0) {
-        Rcpp::Rcout << "Finished " << niter << "th iteration... (Elapsed Time: "
-                    << round((timer.now() - start_iter) / nano) << " seconds)"
-                    << std::endl;
-      }
-    }
 
     // Break the loop if it converges
     if (elbo_diff < eps) {
@@ -521,9 +507,11 @@ void OptimMember::cavi(double eps, int max_iter, int verbose, double max_time) {
     elapsed_time_inner_loop = round((timer.now() - start_iter) / nano);
     // Break the loop if the elapsed time exceeds the maximum time
     if (elapsed_time_inner_loop > max_time) {
-      Rcpp::Rcout
-          << "Interrupted due to the elapsed time exceeds the maximum time"
-          << std::endl;
+      if (verbose) {
+        Rcpp::Rcout
+            << "Interrupted due to the elapsed time exceeds the maximum time"
+            << std::endl;
+      }
       interrupted = true;
       break;
     }
@@ -531,13 +519,6 @@ void OptimMember::cavi(double eps, int max_iter, int verbose, double max_time) {
 
   niter_cavi = niter;
   elapsed_time = round((timer.now() - start_t) / nano * 10000.0) / 10000.0;
-
-  if (verbose > 1) {
-    Rcpp::Rcout << "- Finished CAVI:" << std::endl;
-    Rcpp::Rcout << "  - Total Number of Iteration: " << niter << std::endl;
-    Rcpp::Rcout << "  - Total Elapsed Time: " << elapsed_time << " seconds"
-                << std::endl;
-  }
 }
 
 void OptimMember::update_mutated_info() {
@@ -676,7 +657,8 @@ std::vector<OptimMember> initialization_step(OptimMember data, int n_parents,
 }
 
 std::vector<OptimMember> update_step(std::vector<OptimMember> P, double eps,
-                                     int max_iter, int verbose, int n_threads) {
+                                     int max_iter, bool verbose,
+                                     int n_threads) {
   int n_population = P.size();
   std::vector<OptimMember> P_updated;
   for (int u = 0; u < n_population; u++) {

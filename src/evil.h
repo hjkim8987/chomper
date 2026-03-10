@@ -217,7 +217,7 @@ class OptimMember {
   void initialize(bool custom_initializer = false,
                   Nullable<List> initial_values = R_NilValue);
   void coordinate_ascent();
-  void cavi(double eps, int max_iter, int verbose, double max_time = 604800);
+  void cavi(double eps, int max_iter, bool verbose, double max_time = 604800);
   void update_mutated_info();
   void mutation_split_and_merge();
 };
@@ -234,7 +234,7 @@ std::vector<OptimMember> initialization_step(
     Nullable<List> initial_values = R_NilValue);
 
 std::vector<OptimMember> update_step(std::vector<OptimMember> P, double eps,
-                                     int max_iter, int verbose, int n_threads);
+                                     int max_iter, bool verbose, int n_threads);
 
 std::vector<OptimMember> crossover_step(std::vector<OptimMember> P,
                                         arma::mat combination,

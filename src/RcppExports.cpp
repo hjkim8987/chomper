@@ -13,7 +13,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // EvolutionaryVI
-List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double overlap_prob, int n_parents, int n_children, double tol_cavi, int max_iter_cavi, double tol_evi, int max_iter_evi, int verbose, int n_threads, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
+List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double overlap_prob, int n_parents, int n_children, double tol_cavi, int max_iter_cavi, double tol_evi, int max_iter_evi, bool verbose, int n_threads, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
 RcppExport SEXP _chomper_EvolutionaryVI(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP overlap_probSEXP, SEXP n_parentsSEXP, SEXP n_childrenSEXP, SEXP tol_caviSEXP, SEXP max_iter_caviSEXP, SEXP tol_eviSEXP, SEXP max_iter_eviSEXP, SEXP verboseSEXP, SEXP n_threadsSEXP, SEXP max_timeSEXP, SEXP custom_initializerSEXP, SEXP use_checkpointSEXP, SEXP initial_valuesSEXP, SEXP checkpoint_valuesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -40,7 +40,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type max_iter_cavi(max_iter_caviSEXP);
     Rcpp::traits::input_parameter< double >::type tol_evi(tol_eviSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter_evi(max_iter_eviSEXP);
-    Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
+    Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< int >::type n_threads(n_threadsSEXP);
     Rcpp::traits::input_parameter< double >::type max_time(max_timeSEXP);
     Rcpp::traits::input_parameter< bool >::type custom_initializer(custom_initializerSEXP);
@@ -52,8 +52,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // MCMC
-List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, int n_burnin, int n_gibbs, int n_split_merge, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
-RcppExport SEXP _chomper_MCMC(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP n_burninSEXP, SEXP n_gibbsSEXP, SEXP n_split_mergeSEXP, SEXP max_timeSEXP, SEXP custom_initializerSEXP, SEXP use_checkpointSEXP, SEXP initial_valuesSEXP, SEXP checkpoint_valuesSEXP) {
+List MCMC(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, int n_burnin, int n_gibbs, int n_split_merge, bool verbose, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
+RcppExport SEXP _chomper_MCMC(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP n_burninSEXP, SEXP n_gibbsSEXP, SEXP n_split_mergeSEXP, SEXP verboseSEXP, SEXP max_timeSEXP, SEXP custom_initializerSEXP, SEXP use_checkpointSEXP, SEXP initial_valuesSEXP, SEXP checkpoint_valuesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -75,17 +75,18 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type n_burnin(n_burninSEXP);
     Rcpp::traits::input_parameter< int >::type n_gibbs(n_gibbsSEXP);
     Rcpp::traits::input_parameter< int >::type n_split_merge(n_split_mergeSEXP);
+    Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< double >::type max_time(max_timeSEXP);
     Rcpp::traits::input_parameter< bool >::type custom_initializer(custom_initializerSEXP);
     Rcpp::traits::input_parameter< bool >::type use_checkpoint(use_checkpointSEXP);
     Rcpp::traits::input_parameter< Nullable<List> >::type initial_values(initial_valuesSEXP);
     Rcpp::traits::input_parameter< Nullable<List> >::type checkpoint_values(checkpoint_valuesSEXP);
-    rcpp_result_gen = Rcpp::wrap(MCMC(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values));
+    rcpp_result_gen = Rcpp::wrap(MCMC(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, n_burnin, n_gibbs, n_split_merge, verbose, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values));
     return rcpp_result_gen;
 END_RCPP
 }
 // CoordinateAscentVI
-List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double overlap_prob, double tol_cavi, int max_iter_cavi, int verbose, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
+List CoordinateAscentVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double overlap_prob, double tol_cavi, int max_iter_cavi, bool verbose, double max_time, bool custom_initializer, bool use_checkpoint, Nullable<List> initial_values, Nullable<List> checkpoint_values);
 RcppExport SEXP _chomper_CoordinateAscentVI(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP overlap_probSEXP, SEXP tol_caviSEXP, SEXP max_iter_caviSEXP, SEXP verboseSEXP, SEXP max_timeSEXP, SEXP custom_initializerSEXP, SEXP use_checkpointSEXP, SEXP initial_valuesSEXP, SEXP checkpoint_valuesSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -108,7 +109,7 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< double >::type overlap_prob(overlap_probSEXP);
     Rcpp::traits::input_parameter< double >::type tol_cavi(tol_caviSEXP);
     Rcpp::traits::input_parameter< int >::type max_iter_cavi(max_iter_caviSEXP);
-    Rcpp::traits::input_parameter< int >::type verbose(verboseSEXP);
+    Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
     Rcpp::traits::input_parameter< double >::type max_time(max_timeSEXP);
     Rcpp::traits::input_parameter< bool >::type custom_initializer(custom_initializerSEXP);
     Rcpp::traits::input_parameter< bool >::type use_checkpoint(use_checkpointSEXP);
@@ -170,7 +171,7 @@ END_RCPP
 
 static const R_CallMethodDef CallEntries[] = {
     {"_chomper_EvolutionaryVI", (DL_FUNC) &_chomper_EvolutionaryVI, 29},
-    {"_chomper_MCMC", (DL_FUNC) &_chomper_MCMC, 23},
+    {"_chomper_MCMC", (DL_FUNC) &_chomper_MCMC, 24},
     {"_chomper_CoordinateAscentVI", (DL_FUNC) &_chomper_CoordinateAscentVI, 24},
     {"_chomper_psm_vi", (DL_FUNC) &_chomper_psm_vi, 1},
     {"_chomper_psm_mcmc", (DL_FUNC) &_chomper_psm_mcmc, 1},

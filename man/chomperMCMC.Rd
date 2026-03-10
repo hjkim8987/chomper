@@ -26,7 +26,8 @@ chomperMCMC(
   custom_initializer = FALSE,
   use_checkpoint = FALSE,
   initial_values = NULL,
-  checkpoint_values = NULL
+  checkpoint_values = NULL,
+  verbose_internal = TRUE
 )
 }
 \arguments{
@@ -73,6 +74,8 @@ chomperMCMC(
 \item{initial_values}{The initial values for the parameters (optional).}
 
 \item{checkpoint_values}{The checkpoint values for the parameters (optional).}
+
+\item{verbose_internal}{Whether to print the internal C++ messages (TRUE: print, FALSE: not print).}
 }
 \value{
 A list containing the posterior samples.
@@ -95,7 +98,6 @@ A list of the posterior samples and other information containing:
 \description{
 Fit the CHOMPER model with Markov chain Monte Carlo (MCMC) with split and merge process to estimate the linkage structure across multiple datasets.
 It returns the posterior samples of the linkage structure and other parameters of the CHOMPER model.
-See Kim et al. (2026) for more details.
 }
 \examples{
 # 1. Generate sample data for testing
@@ -130,7 +132,7 @@ hyper_sigma <- matrix(
   ncol = 2, byrow = TRUE
 )
 
-# 4. Fit CHOMPER-CAVI
+# 4. Fit CHOMPER-MCMC
 result <- chomperMCMC(
   x = x,
   k = 3, # number of datasets

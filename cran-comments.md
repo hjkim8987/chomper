@@ -1,9 +1,11 @@
-## Resubmission (0.1.2)
+## Resubmission (0.1.3)
 
 This is a resubmission. Changes since previous submission:
 
-* Replaced all instances of `abs()` with `std::abs()` or `std::fabs()` to ensure proper handling of floating-point arguments, resolving the `-Wabsolute-value` warning.
-* Updated the version number to 0.1.2.
+* References: I have removed the references from the descriptions. This package implements an original method that has not been published yet, so no references (DOI or URL) are available.
+* Replaced `print()` calls with `warning()` in R/inference.R to allow users to suppress console output, as requested.
+* Rcpp codes are update to ensure that all console outputs are wrapped in a `verbose` check.
+* Updated the version number to 0.1.3.
 
 ## R CMD check results
 

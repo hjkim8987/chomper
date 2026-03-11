@@ -25,7 +25,8 @@ chomperDIG(
   batch_size = 10,
   n_epochs = 5,
   max_time = 86400,
-  batch_update = TRUE
+  batch_update = TRUE,
+  verbose_internal = TRUE
 )
 }
 \arguments{
@@ -70,6 +71,8 @@ chomperDIG(
 \item{max_time}{The maximum time limit for the execution in seconds.}
 
 \item{batch_update}{Whether to update the parameters in a batch.}
+
+\item{verbose_internal}{Whether to print the internal C++ messages (TRUE: print, FALSE: not print).}
 }
 \value{
 A list containing the posterior samples.
@@ -141,11 +144,11 @@ result <- chomperDIG(
   hyper_tau = c(0.01, 0.01),
   hyper_epsilon_discrete = c(0, 0),
   hyper_epsilon_continuous = c(0.001, 0.001),
-  decaying_upper_bound = 10.0,
+  decaying_upper_bound = 100.0,
   n_burnin = 0,
   n_gibbs = 100,
-  batch_size = 100,
-  n_epochs = 50
+  batch_size = 5,
+  n_epochs = 5
 )
 
 }

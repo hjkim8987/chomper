@@ -51,7 +51,8 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
          arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi,
          arma::vec hyper_tau, arma::vec hyper_delta,
          double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size,
-         int n_epochs, double max_time, bool batch_update = true);
+         int n_epochs, double max_time, bool batch_update = true,
+         bool verbose = true);
 
 arma::mat psm_vi(arma::field<arma::mat> probs_field);
 

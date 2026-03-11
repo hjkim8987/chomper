@@ -915,7 +915,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
          arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi,
          arma::vec hyper_tau, arma::vec hyper_delta,
          double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size,
-         int n_epochs, double max_time, bool batch_update) {
+         int n_epochs, double max_time, bool batch_update, bool verbose) {
   //// Define empty fields to store MCMC samples
   // linkage structure
   arma::field<arma::field<IntegerVector>> lambda_out(n_gibbs);
@@ -970,7 +970,9 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   bool interrupted = false;
 
   // 1. Initialization
-  Rcpp::Rcout << "CHOMPER (DIG): Start Initialization..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "CHOMPER (DIG): Start Initialization..." << std::endl;
+  }
   // 1.1. Define auxiliary values
   // 1.1.1. Auxiliary index (observations and files) vectors,
   //        which are used for split and merge steps:
@@ -1140,16 +1142,20 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   // 2. MCMC Sampling
   int weight_transition_cycle = n_epochs * N / batch_size;
   if (weight_transition_cycle > total_iteration) {
-    Rcpp::Rcout
-        << "Warning: You need more samples to perform DIG properly. "
-           "The weight transition cycle is longer than the total MCMC samples."
-        << std::endl;
-    Rcpp::Rcout << "         The weight transition is disabled." << std::endl;
+    if (verbose) {
+      Rcpp::Rcout << "Warning: You need more samples to perform DIG properly. "
+                     "The weight transition cycle is longer than the total "
+                     "MCMC samples."
+                  << std::endl;
+      Rcpp::Rcout << "         The weight transition is disabled." << std::endl;
+    }
   }
 
-  Rcpp::Rcout << "MCMC Starts:" << std::endl;
+  if (verbose) Rcpp::Rcout << "MCMC Starts:" << std::endl;
   // 2.1. Burn-in
-  Rcpp::Rcout << " - Burn-in " << n_burnin << " samples..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << " - Burn-in " << n_burnin << " samples..." << std::endl;
+  }
   start_iter = timer.now();
   int burnin_term = (int)(n_burnin / 10);
 
@@ -1163,7 +1169,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   arma::vec sampling_weights(N, arma::fill::ones);
   sampling_weights /= static_cast<double>(N);
 
-  bool uniform_weight = false;
+  bool cooling_down = false;
   arma::vec uniform_weights(N, arma::fill::ones);
   uniform_weights /= static_cast<double>(N);
   // Discomfort-Informed Adaptive Gibbs Sampler
@@ -1179,7 +1185,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
                    continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
                    hyper_delta, hyper_tau);
 
-    if (uniform_weight) {
+    if (cooling_down) {
       sampling_weights = uniform_weights;
     } else {
       // Update allocation matrix
@@ -1209,9 +1215,14 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
     }
 
-    arma::mat sampled_index =
-        sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
-    for (int cdx = 0; cdx < batch_size; cdx++) {
+    arma::mat sampled_index;
+    if (cooling_down) {
+      sampled_index = sampling_index;
+    } else {
+      sampled_index =
+          sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
+    }
+    for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
       int i = sampled_index(cdx, 0);
       int j = sampled_index(cdx, 1);
 
@@ -1231,7 +1242,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     // However, as batch_size lambdas are updated,
     // we need to sample y_{jprime} for all jprime from new lambda assignments.
     if (batch_update) {
-      for (int cdx = 0; cdx < batch_size; cdx++) {
+      for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
         int i = sampled_index(cdx, 0);
         int j = sampled_index(cdx, 1);
         int jprime = lambda(i)(j);
@@ -1304,21 +1315,25 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // TODO: Change this condition using CLL moving average
     if (total_mcmc > xi3) {
-      uniform_weight = true;
+      cooling_down = true;
     }
 
     // Print progress
     if ((((imcmc % burnin_term) == 0) & (imcmc > 0)) || (imcmc == 1)) {
-      Rcpp::Rcout << "Finished " << imcmc << "/" << n_burnin
-                  << " burnin... (Elapsed Time: "
-                  << round((timer.now() - start_iter) / nano) << " seconds)"
-                  << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "Finished " << imcmc << "/" << n_burnin
+                    << " burnin... (Elapsed Time: "
+                    << round((timer.now() - start_iter) / nano) << " seconds)"
+                    << std::endl;
+      }
     }
   }
   int burnin_et = round((timer.now() - start_iter) / nano);
 
   // 2.2. Main MCMC
-  Rcpp::Rcout << " - Main MCMC " << n_gibbs << " samples..." << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << " - Main MCMC " << n_gibbs << " samples..." << std::endl;
+  }
   int save_term = (int)(n_gibbs / 10);
   int n_sample = 0;
   start_iter = timer.now();
@@ -1334,7 +1349,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
                    continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
                    hyper_delta, hyper_tau);
 
-    if (uniform_weight) {
+    if (cooling_down) {
       sampling_weights = uniform_weights;
     } else {
       // Update allocation matrix
@@ -1364,9 +1379,14 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
     }
 
-    arma::mat sampled_index =
-        sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
-    for (int cdx = 0; cdx < batch_size; cdx++) {
+    arma::mat sampled_index;
+    if (cooling_down) {
+      sampled_index = sampling_index;
+    } else {
+      sampled_index =
+          sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
+    }
+    for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
       int i = sampled_index(cdx, 0);
       int j = sampled_index(cdx, 1);
 
@@ -1386,7 +1406,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     // However, as batch_size lambdas are updated,
     // we need to sample y_{jprime} for all jprime from new lambda assignments.
     if (batch_update) {
-      for (int cdx = 0; cdx < batch_size; cdx++) {
+      for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
         int i = sampled_index(cdx, 0);
         int j = sampled_index(cdx, 1);
         int jprime = lambda(i)(j);
@@ -1459,7 +1479,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // TODO: Change this condition using CLL moving average
     if (total_mcmc > xi3) {
-      uniform_weight = true;
+      cooling_down = true;
     }
 
     // Copy current samples; due to memory allocation issue
@@ -1487,10 +1507,12 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
 
     // Print progress
     if (((imcmc % save_term) == 0) & (imcmc > 0)) {
-      Rcpp::Rcout << "   - Finished " << imcmc << "/" << n_gibbs
-                  << " iteration... (Elapsed Time: "
-                  << round((timer.now() - start_iter) / nano) << " seconds)"
-                  << std::endl;
+      if (verbose) {
+        Rcpp::Rcout << "   - Finished " << imcmc << "/" << n_gibbs
+                    << " iteration... (Elapsed Time: "
+                    << round((timer.now() - start_iter) / nano) << " seconds)"
+                    << std::endl;
+      }
     }
 
     interrupted = ((timer.now() - start_t) / nano) > max_time;
@@ -1503,12 +1525,14 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   int main_et = round((timer.now() - start_iter) / nano);
   double total_et = round((timer.now() - start_t) / nano * 10000.0) / 10000.0;
 
-  Rcpp::Rcout << "----------------------------------------" << std::endl;
-  Rcpp::Rcout << "Finished CHOMPER (DIG):" << std::endl;
-  Rcpp::Rcout << " - Total Elapsed Time: " << total_et << " seconds"
-              << std::endl;
-  Rcpp::Rcout << "   - Burn-In: " << burnin_et << " seconds" << std::endl;
-  Rcpp::Rcout << "   - Main MCMC: " << main_et << " seconds" << std::endl;
+  if (verbose) {
+    Rcpp::Rcout << "----------------------------------------" << std::endl;
+    Rcpp::Rcout << "Finished CHOMPER (DIG):" << std::endl;
+    Rcpp::Rcout << " - Total Elapsed Time: " << total_et << " seconds"
+                << std::endl;
+    Rcpp::Rcout << "   - Burn-In: " << burnin_et << " seconds" << std::endl;
+    Rcpp::Rcout << "   - Main MCMC: " << main_et << " seconds" << std::endl;
+  }
 
   return (List::create(
       Named("lambda") = lambda_out, Named("z") = z_out, Named("y") = y_out,

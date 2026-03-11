@@ -731,6 +731,7 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #' @param n_epochs The number of epochs for the discomfort-informed adaptive Gibbs sampler.
 #' @param max_time The maximum time limit for the execution in seconds.
 #' @param batch_update Whether to update the parameters in a batch.
+#' @param verbose_internal Whether to print the internal C++ messages (TRUE: print, FALSE: not print).
 #'
 #' @return A list containing the posterior samples.
 #' @return A list of the posterior samples and other information containing:
@@ -796,11 +797,11 @@ chomperCAVI <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
 #'   hyper_tau = c(0.01, 0.01),
 #'   hyper_epsilon_discrete = c(0, 0),
 #'   hyper_epsilon_continuous = c(0.001, 0.001),
-#'   decaying_upper_bound = 10.0,
+#'   decaying_upper_bound = 100.0,
 #'   n_burnin = 0,
 #'   n_gibbs = 100,
-#'   batch_size = 100,
-#'   n_epochs = 50
+#'   batch_size = 5,
+#'   n_epochs = 5
 #' )
 #'
 #' @export
@@ -812,7 +813,8 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                        decaying_upper_bound = 100.0,
                        n_burnin = 1000, n_gibbs = 1000,
                        batch_size = 10, n_epochs = 5,
-                       max_time = 86400, batch_update = TRUE) {
+                       max_time = 86400, batch_update = TRUE,
+                       verbose_internal = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1
   continuous_fields <- continuous_fields - 1
@@ -921,6 +923,7 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     hyper_delta = hyper_epsilon_discrete,
     decaying_upper_bound = decaying_upper_bound,
     n_burnin = n_burnin, n_gibbs = n_gibbs, batch_size = batch_size,
-    n_epochs = n_epochs, max_time = max_time, batch_update = batch_update
+    n_epochs = n_epochs, max_time = max_time, batch_update = batch_update,
+    verbose = verbose_internal
   ))
 }

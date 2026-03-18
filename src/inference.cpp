@@ -944,11 +944,14 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   NumericVector log_odds(p);
   arma::field<NumericVector> log_theta(n_discrete_fields);
 
+  // Define empty storage for each split and merge results
+  arma::field<arma::mat> split_merge(5);
+
   // Define xi's for phase transition
   int total_iteration = n_burnin + n_gibbs;
-  int xi1 = std::floor(total_iteration * 0.25);
-  int xi2 = std::floor(total_iteration * 0.5);
-  int xi3 = std::floor(total_iteration * 0.75);
+  int xi1 = std::floor(total_iteration * 0.20);
+  int xi2 = std::floor(total_iteration * 0.40);
+  int xi3 = std::floor(total_iteration * 0.60);
 
   // Define probabilities for calculating discomfort and actual discomfort.
   arma::vec discomfort_probability(N);
@@ -1169,8 +1172,6 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   sampling_weights /= static_cast<double>(N);
 
   bool cooling_down = false;
-  arma::vec uniform_weights(N, arma::fill::ones);
-  uniform_weights /= static_cast<double>(N);
   // Discomfort-Informed Adaptive Gibbs Sampler
   for (int imcmc = 0; imcmc < n_burnin; imcmc++) {
     if ((total_mcmc > xi1) & (total_mcmc <= xi2)) {
@@ -1179,14 +1180,12 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       update_cycle = 10;
     }
 
-    // Calculate `nu` using the current samples.
-    nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
-                   continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
-                   hyper_delta, hyper_tau);
+    if (!cooling_down) {
+      // Calculate `nu` using the current samples.
+      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                     continuous_fields, n_continuous_fields, k, n, N,
+                     log_phi_tau, hyper_delta, hyper_tau);
 
-    if (cooling_down) {
-      sampling_weights = uniform_weights;
-    } else {
       // Update allocation matrix
       if ((imcmc % update_cycle) == 0) {
         allocation_matrix = update_allocation_matrix(
@@ -1212,9 +1211,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       }
 
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
-    }
 
-    if (!cooling_down) {
       arma::mat sampled_index =
           sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
 
@@ -1348,14 +1345,12 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       update_cycle = 10;
     }
 
-    // Calculate `nu` using the current samples.
-    nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
-                   continuous_fields, n_continuous_fields, k, n, N, log_phi_tau,
-                   hyper_delta, hyper_tau);
+    if (!cooling_down) {
+      // Calculate `nu` using the current samples.
+      nu = update_nu(x, y, z, discrete_fields, n_discrete_fields,
+                     continuous_fields, n_continuous_fields, k, n, N,
+                     log_phi_tau, hyper_delta, hyper_tau);
 
-    if (cooling_down) {
-      sampling_weights = uniform_weights;
-    } else {
       // Update allocation matrix
       if ((imcmc % update_cycle) == 0) {
         allocation_matrix = update_allocation_matrix(
@@ -1381,9 +1376,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       }
 
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
-    }
 
-    if (!cooling_down) {
       arma::mat sampled_index =
           sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
 

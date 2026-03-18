@@ -813,7 +813,7 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
                        decaying_upper_bound = 100.0,
                        n_burnin = 1000, n_gibbs = 1000,
                        batch_size = 10, n_epochs = 5,
-                       max_time = 86400, batch_update = TRUE,
+                       n_split_merge = 1000, max_time = 86400,
                        verbose_internal = TRUE) {
   # Convert the field indexes to 0-based indexing
   discrete_fields <- discrete_fields - 1
@@ -867,26 +867,34 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (length(hyper_phi) != n_discrete_fields) {
-    print("Warning: hyperparameter (phi) is not provided properly.")
-    print("         The default value, (2.0, ..., 2.0), is used.")
+    warning(
+      "hyperparameter (phi) is not provided properly. ",
+      "The default value, (2.0, ..., 2.0), is used."
+    )
     hyper_phi <- rep(2.0, n_discrete_fields)
   }
 
   if (length(hyper_tau) != n_discrete_fields) {
-    print("Warning: hyperparameter (tau) is not provided properly.")
-    print("         The default value, (0.01, ..., 0.01), is used.")
+    warning(
+      "hyperparameter (tau) is not provided properly. ",
+      "The default value, (0.01, ..., 0.01), is used."
+    )
     hyper_tau <- rep(0.01, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_discrete) != n_discrete_fields) {
-    print("Warning: hyperparameter (hitting range for discrete fields) is not provided properly.")
-    print("         The default value, (0, ..., 0) is used.")
+    warning(
+      "hyperparameter (hitting range for discrete fields) is not provided properly. ",
+      "The default value, (0, ..., 0) is used."
+    )
     hyper_epsilon_discrete <- rep(0, n_discrete_fields)
   }
 
   if (length(hyper_epsilon_continuous) != n_continuous_fields) {
-    print("Warning: hyperparameter (hitting range for continuous fields) is not provided properly.")
-    print("         The default value, (0.001, ..., 0.001), is used.")
+    warning(
+      "hyperparameter (hitting range for continuous fields) is not provided properly. ",
+      "The default value, (0.001, ..., 0.001), is used."
+    )
     hyper_epsilon_continuous <- rep(0.001, n_continuous_fields)
   }
 
@@ -899,8 +907,10 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
   }
 
   if (nrow(hyper_sigma) != n_continuous_fields) {
-    print("Warning: hyperparameter (sigma) is not provided properly.")
-    print("         The default value, Inv-Gamma(0.01, 0.01) is used.")
+    warning(
+      "hyperparameter (sigma) is not provided properly. ",
+      "The default value, Inv-Gamma(0.01, 0.01) is used."
+    )
     hyper_sigma <-
       matrix(
         rep(c(0.01, 0.01), n_continuous_fields),
@@ -923,7 +933,7 @@ chomperDIG <- function(x, k, n, N, p, M, discrete_fields, continuous_fields,
     hyper_delta = hyper_epsilon_discrete,
     decaying_upper_bound = decaying_upper_bound,
     n_burnin = n_burnin, n_gibbs = n_gibbs, batch_size = batch_size,
-    n_epochs = n_epochs, max_time = max_time, batch_update = batch_update,
+    n_epochs = n_epochs, n_split_merge = n_split_merge, max_time = max_time,
     verbose = verbose_internal
   ))
 }

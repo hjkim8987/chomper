@@ -120,8 +120,8 @@ BEGIN_RCPP
 END_RCPP
 }
 // DIG
-List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size, int n_epochs, double max_time, bool batch_update, bool verbose);
-RcppExport SEXP _chomper_DIG(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP decaying_upper_boundSEXP, SEXP n_burninSEXP, SEXP n_gibbsSEXP, SEXP batch_sizeSEXP, SEXP n_epochsSEXP, SEXP max_timeSEXP, SEXP batch_updateSEXP, SEXP verboseSEXP) {
+List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p, arma::vec discrete_fields, int n_discrete_fields, arma::vec M, arma::vec continuous_fields, int n_continuous_fields, arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi, arma::vec hyper_tau, arma::vec hyper_delta, double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size, int n_epochs, int n_split_merge, double max_time, bool verbose);
+RcppExport SEXP _chomper_DIG(SEXP xSEXP, SEXP kSEXP, SEXP nSEXP, SEXP NSEXP, SEXP pSEXP, SEXP discrete_fieldsSEXP, SEXP n_discrete_fieldsSEXP, SEXP MSEXP, SEXP continuous_fieldsSEXP, SEXP n_continuous_fieldsSEXP, SEXP hyper_betaSEXP, SEXP hyper_sigmaSEXP, SEXP hyper_phiSEXP, SEXP hyper_tauSEXP, SEXP hyper_deltaSEXP, SEXP decaying_upper_boundSEXP, SEXP n_burninSEXP, SEXP n_gibbsSEXP, SEXP batch_sizeSEXP, SEXP n_epochsSEXP, SEXP n_split_mergeSEXP, SEXP max_timeSEXP, SEXP verboseSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -145,10 +145,10 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type n_gibbs(n_gibbsSEXP);
     Rcpp::traits::input_parameter< int >::type batch_size(batch_sizeSEXP);
     Rcpp::traits::input_parameter< int >::type n_epochs(n_epochsSEXP);
+    Rcpp::traits::input_parameter< int >::type n_split_merge(n_split_mergeSEXP);
     Rcpp::traits::input_parameter< double >::type max_time(max_timeSEXP);
-    Rcpp::traits::input_parameter< bool >::type batch_update(batch_updateSEXP);
     Rcpp::traits::input_parameter< bool >::type verbose(verboseSEXP);
-    rcpp_result_gen = Rcpp::wrap(DIG(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, max_time, batch_update, verbose));
+    rcpp_result_gen = Rcpp::wrap(DIG(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, n_split_merge, max_time, verbose));
     return rcpp_result_gen;
 END_RCPP
 }

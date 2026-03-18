@@ -24,8 +24,8 @@ chomperDIG(
   n_gibbs = 1000,
   batch_size = 10,
   n_epochs = 5,
+  n_split_merge = 1000,
   max_time = 86400,
-  batch_update = TRUE,
   verbose_internal = TRUE
 )
 }
@@ -70,9 +70,9 @@ chomperDIG(
 
 \item{max_time}{The maximum time limit for the execution in seconds.}
 
-\item{batch_update}{Whether to update the parameters in a batch.}
-
 \item{verbose_internal}{Whether to print the internal C++ messages (TRUE: print, FALSE: not print).}
+
+\item{batch_update}{Whether to update the parameters in a batch.}
 }
 \value{
 A list containing the posterior samples.

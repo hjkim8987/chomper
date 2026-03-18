@@ -6,6 +6,9 @@ args <- commandArgs(TRUE)
 sdx <- as.integer(args[1])
 approach <- as.character(args[2])
 
+sdx <- 1
+approach <- "Conservative"
+i_sim <- 1
 model <- "DIG"
 overlap_ratio <- "high"
 
@@ -134,11 +137,11 @@ for (i_sim in 1:30) {
         hyper_sigma = hyper_sigma,
         decaying_upper_bound = 100.0,
         n_burnin = 0, # number of burn-in samples
-        n_gibbs = 50000, # number of MCMC samples to store
+        n_gibbs = 10000, # number of MCMC samples to store
         batch_size = 50,
         n_epochs = 5,
-        max_time = 86400, # maximum time in second for MCMC
-        batch_update = TRUE
+        n_split_merge = 1000,
+        max_time = 86400 # maximum time in second for MCMC
     )
 
     # performance samples:

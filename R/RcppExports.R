@@ -13,8 +13,8 @@
     .Call(`_chomper_CoordinateAscentVI`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, overlap_prob, tol_cavi, max_iter_cavi, verbose, max_time, custom_initializer, use_checkpoint, initial_values, checkpoint_values)
 }
 
-.DIG <- function(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, max_time, batch_update, verbose) {
-    .Call(`_chomper_DIG`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, max_time, batch_update, verbose)
+.DIG <- function(x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, n_split_merge, max_time, verbose) {
+    .Call(`_chomper_DIG`, x, k, n, N, p, discrete_fields, n_discrete_fields, M, continuous_fields, n_continuous_fields, hyper_beta, hyper_sigma, hyper_phi, hyper_tau, hyper_delta, decaying_upper_bound, n_burnin, n_gibbs, batch_size, n_epochs, n_split_merge, max_time, verbose)
 }
 
 .psm_vi <- function(probs_field) {

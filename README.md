@@ -2,6 +2,8 @@
 # chomper
 
 <!-- badges: start -->
+[![CRAN](https://www.r-pkg.org/badges/version/chomper?color=orange)](https://cran.r-project.org/package=chomper)
+[![download](http://cranlogs.r-pkg.org/badges/grand-total/chomper?color=blue)](https://cran.r-project.org/package=chomper)
 [![R-CMD-check](https://github.com/hjkim8987/chomper/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/hjkim8987/chomper/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 

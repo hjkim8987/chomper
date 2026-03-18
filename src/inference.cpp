@@ -915,7 +915,7 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
          arma::mat hyper_beta, arma::mat hyper_sigma, arma::vec hyper_phi,
          arma::vec hyper_tau, arma::vec hyper_delta,
          double decaying_upper_bound, int n_burnin, int n_gibbs, int batch_size,
-         int n_epochs, double max_time, bool batch_update, bool verbose) {
+         int n_epochs, int n_split_merge, double max_time, bool verbose) {
   //// Define empty fields to store MCMC samples
   // linkage structure
   arma::field<arma::field<IntegerVector>> lambda_out(n_gibbs);
@@ -948,7 +948,6 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   int total_iteration = n_burnin + n_gibbs;
   int xi1 = std::floor(total_iteration * 0.25);
   int xi2 = std::floor(total_iteration * 0.5);
-  // TODO: Change xi3 using CLL moving average
   int xi3 = std::floor(total_iteration * 0.75);
 
   // Define probabilities for calculating discomfort and actual discomfort.
@@ -1215,33 +1214,29 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
     }
 
-    arma::mat sampled_index;
-    if (cooling_down) {
-      sampled_index = sampling_index;
-    } else {
-      sampled_index =
+    if (!cooling_down) {
+      arma::mat sampled_index =
           sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
-    }
-    for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
-      int i = sampled_index(cdx, 0);
-      int j = sampled_index(cdx, 1);
 
-      arma::rowvec weights_ij = nu(i).row(j);
+      for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
+        int i = sampled_index(cdx, 0);
+        int j = sampled_index(cdx, 1);
 
-      // Update linkage structure lambda_{ij} using allocation matrix
-      lambda(i)(j) =
-          sample(entire_index, 1, false,
-                 NumericVector(weights_ij.begin(), weights_ij.end()))[0];
-    }
+        arma::rowvec weights_ij = nu(i).row(j);
 
-    // Sample the rest of the parameters
-    // y, z: the order matters,
-    // because the updated lambda affects the latent records,
-    // and finally the new distortion indicator should be updated
-    // based on the updated latent records.
-    // However, as batch_size lambdas are updated,
-    // we need to sample y_{jprime} for all jprime from new lambda assignments.
-    if (batch_update) {
+        // Update linkage structure lambda_{ij} using allocation matrix
+        lambda(i)(j) =
+            sample(entire_index, 1, false,
+                   NumericVector(weights_ij.begin(), weights_ij.end()))[0];
+      }
+
+      // Sample the rest of the parameters
+      // y, z: the order matters,
+      // because the updated lambda affects the latent records,
+      // and finally the new distortion indicator should be updated
+      // based on the updated latent records.
+      // However, as batch_size lambdas are updated,
+      // we need to sample y_{jprime} for all jprime from new lambda.
       for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
         int i = sampled_index(cdx, 0);
         int j = sampled_index(cdx, 1);
@@ -1258,21 +1253,31 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
             n_continuous_fields, hyper_tau, x_probability);
       }
     } else {
-      // Sampling y_{jprime} for all jprime = 1, ..., N
-      for (int jprime = 0; jprime < N; jprime++) {
-        y.row(jprime) = update_latent_record(
-            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
-            M, p, discrete_fields, n_discrete_fields, continuous_fields,
-            n_continuous_fields, x_in_range);
-      }
+      // Split and Merge
+      for (int isim = 0; isim < n_split_merge; isim++) {
+        split_merge = do_split_merge(
+            files, indices, entire_index, k, n, p, M, x, y, z, lambda, beta,
+            theta, eta, sigma, log_odds, log_theta, discrete_fields,
+            n_discrete_fields, continuous_fields, n_continuous_fields,
+            hyper_phi, hyper_tau, mu, x_probability, log_x_probability,
+            x_in_range, false);
 
-      // Sampling z_{ij} for all i = 1, ..., k and j = 1, ..., n(i)
-      for (int i = 0; i < k; i++) {
-        for (int j = 0; j < n(i); j++) {
-          z(i).row(j) = update_distortion(
-              x(i).row(j), y.row(lambda(i)(j)), beta, theta, eta, sigma, p,
-              discrete_fields, n_discrete_fields, continuous_fields,
-              n_continuous_fields, hyper_tau, x_probability);
+        if (split_merge(0)(0, 0) == 1) {
+          // Accept Split and Merge Result:
+          // i.e., shift Lambda to Lambda', y to y', and z to z'
+          for (size_t c = 0; c < split_merge(1).n_rows; c++) {
+            // Shift Lambda to Lambda'
+            lambda(split_merge(1)(c, 0))(split_merge(1)(c, 1)) =
+                split_merge(1)(c, 2);
+
+            // Shift z to z'
+            z(split_merge(1)(c, 0)).row(split_merge(1)(c, 1)) =
+                split_merge(3).row(c);
+          }
+          // Shift y to y'
+          for (size_t yl = 0; yl < split_merge(4).n_rows; yl++) {
+            y.row(split_merge(4)(yl, 0)) = split_merge(2).row(yl);
+          }
         }
       }
     }
@@ -1313,7 +1318,6 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       tanh_weight = false;
     }
 
-    // TODO: Change this condition using CLL moving average
     if (total_mcmc > xi3) {
       cooling_down = true;
     }
@@ -1379,33 +1383,29 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       sampling_weights = f_weight * sampling_weights + g_weight * discomfort;
     }
 
-    arma::mat sampled_index;
-    if (cooling_down) {
-      sampled_index = sampling_index;
-    } else {
-      sampled_index =
+    if (!cooling_down) {
+      arma::mat sampled_index =
           sample_index_matrix(sampling_index, sampling_weights, batch_size, N);
-    }
-    for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
-      int i = sampled_index(cdx, 0);
-      int j = sampled_index(cdx, 1);
 
-      arma::rowvec weights_ij = nu(i).row(j);
+      for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
+        int i = sampled_index(cdx, 0);
+        int j = sampled_index(cdx, 1);
 
-      // Update linkage structure lambda_{ij} using allocation matrix
-      lambda(i)(j) =
-          sample(entire_index, 1, false,
-                 NumericVector(weights_ij.begin(), weights_ij.end()))[0];
-    }
+        arma::rowvec weights_ij = nu(i).row(j);
 
-    // Sample the rest of the parameters
-    // y, z: the order matters,
-    // because the updated lambda affects the latent records,
-    // and finally the new distortion indicator should be updated
-    // based on the updated latent records.
-    // However, as batch_size lambdas are updated,
-    // we need to sample y_{jprime} for all jprime from new lambda assignments.
-    if (batch_update) {
+        // Update linkage structure lambda_{ij} using allocation matrix
+        lambda(i)(j) =
+            sample(entire_index, 1, false,
+                   NumericVector(weights_ij.begin(), weights_ij.end()))[0];
+      }
+
+      // Sample the rest of the parameters
+      // y, z: the order matters,
+      // because the updated lambda affects the latent records,
+      // and finally the new distortion indicator should be updated
+      // based on the updated latent records.
+      // However, as batch_size lambdas are updated,
+      // we need to sample y_{jprime} for all jprime from new lambda.
       for (int cdx = 0; cdx < sampled_index.n_rows; cdx++) {
         int i = sampled_index(cdx, 0);
         int j = sampled_index(cdx, 1);
@@ -1422,21 +1422,31 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
             n_continuous_fields, hyper_tau, x_probability);
       }
     } else {
-      // Sampling y_{jprime} for all jprime = 1, ..., N
-      for (int jprime = 0; jprime < N; jprime++) {
-        y.row(jprime) = update_latent_record(
-            hyper_phi, hyper_tau, x, lambda, z, theta, eta, sigma, jprime, k, n,
-            M, p, discrete_fields, n_discrete_fields, continuous_fields,
-            n_continuous_fields, x_in_range);
-      }
+      // Split and Merge
+      for (int isim = 0; isim < n_split_merge; isim++) {
+        split_merge = do_split_merge(
+            files, indices, entire_index, k, n, p, M, x, y, z, lambda, beta,
+            theta, eta, sigma, log_odds, log_theta, discrete_fields,
+            n_discrete_fields, continuous_fields, n_continuous_fields,
+            hyper_phi, hyper_tau, mu, x_probability, log_x_probability,
+            x_in_range, false);
 
-      // Sampling z_{ij} for all i = 1, ..., k and j = 1, ..., n(i)
-      for (int i = 0; i < k; i++) {
-        for (int j = 0; j < n(i); j++) {
-          z(i).row(j) = update_distortion(
-              x(i).row(j), y.row(lambda(i)(j)), beta, theta, eta, sigma, p,
-              discrete_fields, n_discrete_fields, continuous_fields,
-              n_continuous_fields, hyper_tau, x_probability);
+        if (split_merge(0)(0, 0) == 1) {
+          // Accept Split and Merge Result:
+          // i.e., shift Lambda to Lambda', y to y', and z to z'
+          for (size_t c = 0; c < split_merge(1).n_rows; c++) {
+            // Shift Lambda to Lambda'
+            lambda(split_merge(1)(c, 0))(split_merge(1)(c, 1)) =
+                split_merge(1)(c, 2);
+
+            // Shift z to z'
+            z(split_merge(1)(c, 0)).row(split_merge(1)(c, 1)) =
+                split_merge(3).row(c);
+          }
+          // Shift y to y'
+          for (size_t yl = 0; yl < split_merge(4).n_rows; yl++) {
+            y.row(split_merge(4)(yl, 0)) = split_merge(2).row(yl);
+          }
         }
       }
     }
@@ -1477,7 +1487,6 @@ List DIG(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       tanh_weight = false;
     }
 
-    // TODO: Change this condition using CLL moving average
     if (total_mcmc > xi3) {
       cooling_down = true;
     }

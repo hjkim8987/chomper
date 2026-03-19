@@ -126,12 +126,8 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
   OptimMember P_previous_best = P0[0];
   OptimMember P_best = P0[0];
 
-  arma::colvec sim_prob_old(N * (N - 1) / 2, arma::fill::ones);
-  arma::colvec sim_prob_new(N * (N - 1) / 2, arma::fill::zeros);
-
   bool elbo_flag = false;
   bool elbo_decreasing = false;
-  bool sim_flag = false;
   bool niters_flag = false;
   bool converged = false;
   bool interrupted = false;
@@ -179,10 +175,6 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
     P_current_best = P4[0];
     ELBO_best.push_back(P_current_best.getELBO());
 
-    arma::mat psm =
-        posterior_similarity(P_current_best.getApproximatedNu(), false);
-    sim_prob_new = psm.col(2);
-
     if (niter > 0) {
       if (verbose) {
         Rcpp::Rcout << "Generation #" << niter + 1
@@ -193,13 +185,11 @@ List EvolutionaryVI(arma::field<arma::mat> x, int k, arma::vec n, int N, int p,
       elbo_flag = std::fabs((ELBO_best[niter] - ELBO_best[niter - 1]) /
                             ELBO_best[niter - 1]) < tol_evi;
       elbo_decreasing = ELBO_best[niter] < ELBO_best[niter - 1];
-      sim_flag = arma::abs(sim_prob_new - sim_prob_old).max() < tol_evi;
       niters_flag = (niter >= max_iter_evi);
 
-      converged = elbo_flag || elbo_decreasing || sim_flag || niters_flag;
+      converged = elbo_flag || elbo_decreasing || niters_flag;
     }
 
-    sim_prob_old = sim_prob_new;
     niter += 1;
 
     P0 = P5;

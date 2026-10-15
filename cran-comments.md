@@ -7,7 +7,9 @@ This update addresses request to make linking to libatomic conditional on its av
 
 ## R CMD check results
 
-0 errors | 0 warnings | 1 note
+0 errors | 0 warnings | 0 notes
+
+The `.vscode` directory has been excluded from the source package via `.Rbuildignore`, resolving the previous NOTE about hidden files and directories.
 
 ## Test environments
 

@@ -1,5 +1,4 @@
 # Workflow derived from https://github.com/r-lib/actions/tree/v2/examples
-# Need help debugging build failures? Start at https://github.com/r-lib/actions#where-to-find-help
 on:
   push:
     branches: [main, master]
@@ -12,7 +11,6 @@ permissions: read-all
 jobs:
   R-CMD-check:
     runs-on: ${{ matrix.config.os }}
-
     name: ${{ matrix.config.os }} (${{ matrix.config.r }})
 
     strategy:
@@ -20,15 +18,15 @@ jobs:
       matrix:
         config:
           - {os: macos-latest,   r: 'release'}
+          - {os: macos-latest,   r: 'devel'}
           - {os: windows-latest, r: 'release'}
-          - {os: ubuntu-latest,   r: 'devel', http-user-agent: 'release'}
-          - {os: ubuntu-latest,   r: 'release'}
-          - {os: ubuntu-latest,   r: 'oldrel-1'}
-          - {os: ubuntu-latest,   r: 'release', compiler: 'clang'}
+          - {os: ubuntu-latest,  r: 'devel', http-user-agent: 'release'}
+          - {os: ubuntu-latest,  r: 'release'}
+          - {os: ubuntu-latest,  r: 'oldrel-1'}
 
     env:
       GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
-      R_KEEP_PKG_SOURCE: yes
+      R_KEEP_PKG_SOURCE: 'yes'
 
     steps:
       - uses: actions/checkout@v4
@@ -41,12 +39,45 @@ jobs:
           http-user-agent: ${{ matrix.config.http-user-agent }}
           use-public-rspm: true
 
+      - name: Show macOS toolchain
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          sw_vers
+          uname -m
+          R --version
+          for var in CC CXX FC FLIBS; do
+            printf '%s: ' "$var"
+            R CMD config "$var"
+          done
+
+      # Fail rather than accidentally report a gfortran run as a flang test.
+      - name: Verify flang for macOS R-devel
+        if: runner.os == 'macOS' && matrix.config.r == 'devel'
+        shell: bash
+        run: |
+          fc="$(R CMD config FC)"
+          if [[ "$fc" != *flang* ]]; then
+            echo "::error::Expected flang for macOS R-devel, but FC=$fc"
+            exit 1
+          fi
+
       - uses: r-lib/actions/setup-r-dependencies@v2
         with:
           extra-packages: any::rcmdcheck
           needs: check
 
+      - name: Show RcppThread linker flags
+        if: runner.os == 'macOS'
+        shell: Rscript {0}
+        run: |
+          cat("RcppThread version:", as.character(packageVersion("RcppThread")), "\n")
+          cat("RcppThread::LdFlags(): ")
+          RcppThread::LdFlags()
+          cat("\n")
+
       - uses: r-lib/actions/check-r-package@v2
         with:
           upload-snapshots: true
+          upload-results: true
           build_args: 'c("--no-manual","--compact-vignettes=gs+qpdf")'

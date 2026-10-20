@@ -1654,30 +1654,25 @@ List evaluate_performance(arma::field<IntegerVector> estimation,
 
   double tp = 0;
   double fp = 0;
-  for (unsigned int i = 0; i < combination_matrix.n_rows; i++) {
-    if (combination_result(i, 1) == 0) {
-      if (combination_result(i, 0) == 1) {
-        // Truth: Not Linked, Estimation: Linked
-        // False Positive
-        fp += 1;
-      }
-    } else if (combination_result(i, 1) == 1) {
-      if (combination_result(i, 0) == 1) {
-        // Truth: Linked, Estimation: Linked
-        // True Positive
-        tp += 1;
-      }
-    }
-  }
-
   double tn = 0;
   double fn = 0;
-  for (int i = 0; i < N; i++) {
-    if ((truth(i).length() == 1) && (estimation(i).length() == 1)) {
+  for (unsigned int i = 0; i < combination_matrix.n_rows; i++) {
+    int estimated_linked = combination_result(i, 0);
+    int true_linked = combination_result(i, 1);
+
+    if ((true_linked == 1) && (estimated_linked == 1)) {
+      // Truth: Linked, Estimation: Linked
+      // True Positive
+      tp += 1;
+    } else if ((true_linked == 0) && (estimated_linked == 1)) {
+      // Truth: Not Linked, Estimation: Linked
+      // False Positive
+      fp += 1;
+    } else if ((true_linked == 0) && (estimated_linked == 0)) {
       // Truth: Not Linked, Estimation: Not Linked
       // True Negative
       tn += 1;
-    } else if ((truth(i).length() > 1) && (estimation(i).length() == 1)) {
+    } else if ((true_linked == 1) && (estimated_linked == 0)) {
       // Truth: Linked, Estimation: Not Linked
       // False Negative
       fn += 1;

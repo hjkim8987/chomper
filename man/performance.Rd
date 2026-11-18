@@ -20,19 +20,19 @@ a list with performance metrics. If \code{return_matrix} is true, it also return
 }
 \description{
 Based on the true linkage structure and the estimate, it will calculate several metrics including true positive, true negative, false positive, false negative, false positive rate, and false negative rate.
-This package recommends using the output of \code{links} function of the \code{blink} package as an argument to \code{performance} function.
+The output of \code{links_from_labels} can be used for both \code{estimation} and \code{truth}.
 }
 \examples{
 # 1. True linkage structure
 total_number_of_records <- 6
 
 truth <- matrix(
-  list(c(1), c(2, 4), c(3), c(2, 4), c(5, 6), c(5, 6))
+    list(c(1), c(2, 4), c(3), c(2, 4), c(5, 6), c(5, 6))
 )
 
 # 2. Estimated linkage structure
 estimation <- matrix(
-  list(c(1), c(2, 4), c(3), c(2, 4), c(5), c(6))
+    list(c(1), c(2, 4), c(3), c(2, 4), c(5), c(6))
 )
 
 # 3. Calculate performance metrics

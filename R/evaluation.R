@@ -13,12 +13,12 @@
 #'
 #' nu1 <- matrix(runif(n_file1^2 * n_file2), nrow = n_file1)
 #' for (i in 1:n_file1) {
-#'   nu1[i, ] <- nu1[i, ] / sum(nu1[i, ])
+#'     nu1[i, ] <- nu1[i, ] / sum(nu1[i, ])
 #' }
 #'
 #' nu2 <- matrix(runif(n_file1 * n_file2^2), nrow = n_file2)
 #' for (i in 1:n_file2) {
-#'   nu2[i, ] <- nu2[i, ] / sum(nu2[i, ])
+#'     nu2[i, ] <- nu2[i, ] / sum(nu2[i, ])
 #' }
 #'
 #' # 2. Convert into the appropriate type to run a function
@@ -29,9 +29,9 @@
 #'
 #' @export
 psm_vi <- function(probs_field) {
-  result <- .psm_vi(probs_field)
-  n <- nrow(result)
-  return(round(result, nchar(n) + 1))
+    result <- .psm_vi(probs_field)
+    n <- nrow(result)
+    return(round(result, nchar(n) + 1))
 }
 
 #' @title Calculate the posterior similarity matrix
@@ -52,7 +52,7 @@ psm_vi <- function(probs_field) {
 #' number_of_samples <- 10
 #' lambda_matrix <- matrix(nrow = number_of_samples, ncol = number_of_records)
 #' for (i in 1:number_of_samples) {
-#'   lambda_matrix[i, ] <- sample(1:number_of_records, number_of_records, TRUE)
+#'     lambda_matrix[i, ] <- sample(1:number_of_records, number_of_records, TRUE)
 #' }
 #'
 #' # 2. Calculate a posterior similarity matrix
@@ -60,9 +60,9 @@ psm_vi <- function(probs_field) {
 #'
 #' @export
 psm_mcmc <- function(samples) {
-  result <- .psm_mcmc(samples)
-  n <- nrow(result)
-  return(round(result, nchar(n) + 1))
+    result <- .psm_mcmc(samples)
+    n <- nrow(result)
+    return(round(result, nchar(n) + 1))
 }
 
 #' @title Flatten the posterior samples, lambda, into a matrix
@@ -88,10 +88,10 @@ psm_mcmc <- function(samples) {
 #' number_of_samples <- 10
 #' lambda <- list()
 #' for (i in 1:number_of_samples) {
-#'   lambda[[i]] <- list(
-#'     sample(1:number_of_records, n_file1, TRUE),
-#'     sample(1:number_of_records, n_file2, TRUE)
-#'   )
+#'     lambda[[i]] <- list(
+#'         sample(1:number_of_records, n_file1, TRUE),
+#'         sample(1:number_of_records, n_file2, TRUE)
+#'     )
 #' }
 #'
 #' # 2. Converts a list of posterior samples of lambda into a matrix
@@ -100,13 +100,47 @@ psm_mcmc <- function(samples) {
 #' @export
 flatten_posterior_samples <- function(
     samples, k, N) {
-  return(.flatten_posterior_samples(samples, k, N))
+    return(.flatten_posterior_samples(samples, k, N))
+}
+
+#' @title Convert entity labels to a linkage structure
+#' @description
+#' This function converts a vector of entity labels into a linkage structure.
+#' Records with the same label are linked to each other.
+#' The output can be used as an argument to \code{performance}.
+#'
+#' @param labels a vector of cluster labels, one for each record. The records of all files have to be stacked in the order of the files.
+#'
+#' @return a list in an N by 1 matrix form, where N is the total number of records. The \eqn{i}th element contains the indexes of all records linked to the \eqn{i}th record, including itself.
+#'
+#' @examples
+#' # 1. Create a vector of entity labels
+#' labels <- c(1, 2, 3, 2, 5, 5)
+#'
+#' # 2. Convert the labels into a linkage structure
+#' links_from_labels(labels)
+#'
+#' @export
+links_from_labels <- function(labels) {
+    labels <- as.vector(labels)
+    N <- length(labels)
+    result <- vector("list", N)
+
+    if (anyNA(labels)) {
+        stop("labels must not contain missing values.")
+    }
+
+    for (i in seq_along(labels)) {
+        result[[i]] <- as.numeric(which(labels == labels[i]))
+    }
+
+    return(matrix(result, nrow = N, ncol = 1))
 }
 
 #' @title Evaluate the performance of the linkage structure estimation
 #' @description
 #' Based on the true linkage structure and the estimate, it will calculate several metrics including true positive, true negative, false positive, false negative, false positive rate, and false negative rate.
-#' This package recommends using the output of \code{links} function of the \code{blink} package as an argument to \code{performance} function.
+#' The output of \code{links_from_labels} can be used for both \code{estimation} and \code{truth}.
 #'
 #' @param estimation estimated linkage structure
 #' @param truth true linkage structure
@@ -120,12 +154,12 @@ flatten_posterior_samples <- function(
 #' total_number_of_records <- 6
 #'
 #' truth <- matrix(
-#'   list(c(1), c(2, 4), c(3), c(2, 4), c(5, 6), c(5, 6))
+#'     list(c(1), c(2, 4), c(3), c(2, 4), c(5, 6), c(5, 6))
 #' )
 #'
 #' # 2. Estimated linkage structure
 #' estimation <- matrix(
-#'   list(c(1), c(2, 4), c(3), c(2, 4), c(5), c(6))
+#'     list(c(1), c(2, 4), c(3), c(2, 4), c(5), c(6))
 #' )
 #'
 #' # 3. Calculate performance metrics
@@ -133,5 +167,5 @@ flatten_posterior_samples <- function(
 #'
 #' @export
 performance <- function(estimation, truth, N, return_matrix = FALSE) {
-  return(.evaluate_performance(estimation, truth, N, return_matrix))
+    return(.evaluate_performance(estimation, truth, N, return_matrix))
 }

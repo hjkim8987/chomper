@@ -86,7 +86,7 @@ result <- chomperEVIL(
 # Performance evaluation
 psm_ <- psm_vi(result$nu) # Calculate a posterior similarity matrix
 
-# install.pakcages("salso")
+# install.packages("salso")
 library(salso)
 
 salso_estimate <- salso(psm_,
@@ -94,23 +94,14 @@ salso_estimate <- salso(psm_,
   maxZealousAttempts = 0, probSequentialAllocation = 1
 ) # Find a Bayes estimate that minimizes Binder's loss
 
-linkage_structure <- list()
-for (ll in seq_along(salso_estimate)) {
-  linkage_structure[[ll]] <- which(salso_estimate == salso_estimate[ll])
-}
-linkage_estimation <- matrix(linkage_structure)
-
-# install.packages("blink")
-library(blink)
+linkage_estimation <- links_from_labels(salso_estimate)
 
 key_temp <- c()
 for (i in 1:3) {
   key_temp <- c(key_temp, sample_data[[i]][, "id"])
 }
 
-truth_binded <- matrix(key_temp, nrow = 1)
-linkage_structure_true <- links(truth_binded, TRUE, TRUE)
-linkage_truth <- matrix(linkage_structure_true)
+linkage_truth <- links_from_labels(key_temp)
 
 perf <- performance(linkage_estimation, linkage_truth, N)
 print(perf)
@@ -133,6 +124,7 @@ print(perf)
 
 - `psm_mcmc()`: Posterior similarity matrix for MCMC results
 - `psm_vi()`: Posterior similarity matrix for variational inference
+- `links_from_labels()`: Convert entity labels to a linkage structure
 - `performance()`: Evaluate performance of estimation
 
 ## License

@@ -32,10 +32,10 @@ number_of_records <- n_file1 + n_file2
 number_of_samples <- 10
 lambda <- list()
 for (i in 1:number_of_samples) {
-  lambda[[i]] <- list(
-    sample(1:number_of_records, n_file1, TRUE),
-    sample(1:number_of_records, n_file2, TRUE)
-  )
+    lambda[[i]] <- list(
+        sample(1:number_of_records, n_file1, TRUE),
+        sample(1:number_of_records, n_file2, TRUE)
+    )
 }
 
 # 2. Converts a list of posterior samples of lambda into a matrix

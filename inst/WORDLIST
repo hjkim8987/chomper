@@ -5,6 +5,7 @@ ELBO
 ISHIW
 NASCREG
 NETINCOME
+README
 VALABIT
 Variational
 boldsymbol
@@ -12,6 +13,7 @@ cdots
 deduplication
 frac
 geq
+ggplot
 ij
 ijl
 initializer
@@ -21,7 +23,9 @@ lvert
 mathbb
 preprocessed
 rvert
+salso
 softmax
 stackrel
+th
 varepsilon
 variational

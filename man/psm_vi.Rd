@@ -22,12 +22,12 @@ n_file2 <- 3
 
 nu1 <- matrix(runif(n_file1^2 * n_file2), nrow = n_file1)
 for (i in 1:n_file1) {
-  nu1[i, ] <- nu1[i, ] / sum(nu1[i, ])
+    nu1[i, ] <- nu1[i, ] / sum(nu1[i, ])
 }
 
 nu2 <- matrix(runif(n_file1 * n_file2^2), nrow = n_file2)
 for (i in 1:n_file2) {
-  nu2[i, ] <- nu2[i, ] / sum(nu2[i, ])
+    nu2[i, ] <- nu2[i, ] / sum(nu2[i, ])
 }
 
 # 2. Convert into the appropriate type to run a function

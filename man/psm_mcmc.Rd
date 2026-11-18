@@ -25,7 +25,7 @@ number_of_records <- n_file1 + n_file2
 number_of_samples <- 10
 lambda_matrix <- matrix(nrow = number_of_samples, ncol = number_of_records)
 for (i in 1:number_of_samples) {
-  lambda_matrix[i, ] <- sample(1:number_of_records, number_of_records, TRUE)
+    lambda_matrix[i, ] <- sample(1:number_of_records, number_of_records, TRUE)
 }
 
 # 2. Calculate a posterior similarity matrix

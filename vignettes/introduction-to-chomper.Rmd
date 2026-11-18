@@ -12,6 +12,16 @@ knitr::opts_chunk$set(
   collapse = TRUE,
   comment = "#>"
 )
+
+has_salso <- requireNamespace("salso", quietly = TRUE)
+has_plots <-
+  requireNamespace("ggplot2", quietly = TRUE) &&
+    requireNamespace("patchwork", quietly = TRUE)
+
+if (has_plots) {
+  library(ggplot2)
+  library(patchwork)
+}
 ```
 
 We will demonstrate the use of the `chomper` package.
@@ -216,11 +226,8 @@ If you run the model using `chomperEVIL`, you can access the approximated parame
 Using $\boldsymbol{\Lambda}$ sampled via `chomperMCMC`, we can estimate the linkage structure and evaluate estimation performance using the unique identifiers in the `italy` dataset.
 While we can compute various point estimates using posterior samples, we use a Bayes estimate that minimizes Binder's loss.
 Since the `chomper` package does not provide a function to compute the Bayes estimate, we use the `salso` function from the `salso` package to compute a Bayes estimate.
-First, we use `ID`, the unique identifier of the `italy` dataset, and the `links` function from the `blink` package to find the true linkage structure.
+First, we use `ID`, the unique identifier of the `italy` dataset, and the `links_from_labels` function to find the true linkage structure.
 ```{r, echo=TRUE, message=FALSE}
-library(blink)
-library(salso)
-
 for (i in 1:k) { # `k` represents the number of files
   if (i == 1) {
     key_true <- dat[[i]][, "ID"]
@@ -230,10 +237,7 @@ for (i in 1:k) { # `k` represents the number of files
 }
 
 # Find the true linkage structure.
-# An external R package, `blink`, is used, especially, `blink::links`
-truth_binded <- matrix(key_true, nrow = 1)
-linkage_structure_true <- links(truth_binded, TRUE, TRUE)
-linkage_truth <- matrix(linkage_structure_true)
+linkage_truth <- links_from_labels(key_true)
 
 head(linkage_truth)
 ```
@@ -248,7 +252,10 @@ Therefore, the process of calculating the posterior similarity matrix using `res
 Since `chomperMCMC` returns posterior samples as a list, use the `flatten_posterior_samples` function provided by the `chomper` package to convert the posterior samples into a matrix format.
 Next, we compute the posterior similarity matrix using the `psm_mcmc` function.
 If `chomperEVIL` is used, the approximate posterior variational factors, `res$nu`, can be used directly as an argument to `psm_vi` to compute the posterior similarity matrix.
-```{r, echo=TRUE, message=FALSE}
+```{asis, echo=!has_salso}
+**Note:** the `salso` package was not available when this vignette was built, so the code in the rest of this step is shown without being evaluated.
+```
+```{r, echo=TRUE, message=FALSE, eval=isTRUE(get0("has_salso"))}
 # In order to use MCMC samples:
 #   1. slice the actual MCMC samples
 #   2. reshape a list into a matrix form
@@ -261,26 +268,24 @@ psm_lambda <- psm_mcmc(lambda_binded)
 
 # # Approximate posterior distribution is used directly
 # # to calculate a posterior similarity matrix
-# psm_lambda <- psm_vi(result$nu)
+# psm_lambda <- psm_vi(res$nu)
 
 # Calculate a Bayes estimate that minimizes Binder's loss
-salso_estimate <- salso(round(psm_lambda, nchar(N) + 1), # rounding is implemented to avoid floating-point error
-  loss = binder(),
+salso_estimate <- salso::salso(
+  round(psm_lambda, nchar(N) + 1),
+  # rounding is implemented to avoid floating-point error
+  loss = salso::binder(),
   maxZealousAttempts = 0, probSequentialAllocation = 1
 )
 
 # Convert a Bayes estimate to have an appropriate structure to evaluate the performance
-linkage_structure <- list()
-for (ll in seq_along(salso_estimate)) {
-  linkage_structure[[ll]] <- which(salso_estimate == salso_estimate[ll])
-}
-linkage_estimation <- matrix(linkage_structure)
+linkage_estimation <- links_from_labels(salso_estimate)
 ```
 
 The package provides a function, `performance`, that evaluates performance given an estimate and truth.
 This function returns several performance metrics, including true positives, true negatives, false positives, false negatives, false positive rate, and false negative rate, in a list format.
 Using the `return_matrix=TRUE` option, the function also returns the linkage estimation results for each record pair in a matrix format.
-```{r, echo=TRUE, message=FALSE}
+```{r, echo=TRUE, message=FALSE, eval=isTRUE(get0("has_salso"))}
 # Calculate the performance of the estimation
 perf <- performance(linkage_estimation, linkage_truth, N, FALSE)
 
@@ -326,7 +331,10 @@ res <- chomperMCMC(
 
 The number of burn-in samples is determined by the trace plot of number of unique $\lambda_{ij}$'s in the lower left.
 Using the posterior samples, the number of unique entities in the data can also be estimated and visualized, as in the density plot in the lower right.
-```{r, echo=TRUE, message=FALSE, warning=FALSE, fig.width=8, fig.height=3, out.width="95%"}
+```{asis, echo=!has_plots}
+**Note:** the `ggplot2` (>= 3.5.0) and `patchwork` packages were not available when this vignette was built, so the code below is shown without the resulting figure.
+```
+```{r, echo=TRUE, message=FALSE, eval=isTRUE(get0("has_plots")), warning=FALSE, fig.width=8, fig.height=3, out.width="95%"}
 library(ggplot2)
 library(patchwork)
 
@@ -374,5 +382,5 @@ plot_density <- ggplot(df_density) +
     axis.line.y = element_line(linewidth = .2)
   )
 
-plot_trace + plot_density + plot_layout(ncol = 2)
+print(plot_trace + plot_density + plot_layout(ncol = 2))
 ```

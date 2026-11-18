@@ -1,15 +1,15 @@
 ## Update (0.1.4)
 
-This update addresses request to make linking to libatomic conditional on its availability.
+This update addresses the reported CRAN check problems concerning unavailable suggested packages and unconditional use of suggested packages in the vignette.
 
-* The unconditional use of -latomic in src/Makevars has been replaced with a check for library availability.
+* Removed 'blink' from Suggests and replaced the uses of blink::links() in the vignette and README with an in-package function that converts cluster labels to linkage structures.
+* Made the use of 'salso', 'ggplot2', and 'patchwork' conditional in the vignette, including subsequent chunks that depend on their results.
+* Corrected performance() to count true negatives and false negatives over pairs of records, consistently with true positives and false positives.
 * Updated the version number to 0.1.4.
 
 ## R CMD check results
 
 0 errors | 0 warnings | 0 notes
-
-The `.vscode` directory has been excluded from the source package via `.Rbuildignore`, resolving the previous NOTE about hidden files and directories.
 
 ## Test environments
 
